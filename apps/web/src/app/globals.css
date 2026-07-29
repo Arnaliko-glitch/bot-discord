@@ -11,6 +11,7 @@
   --card-hover: #222633;
   --border: #2a2f3d;
   --accent: #5865f2;
+  --accent-rgb: 88 101 242;
   --accent-hover: #4752c4;
   --success: #3ba55d;
   --warning: #faa81a;
@@ -49,6 +50,6 @@ body {
   }
 
   .sidebar-link-active {
-    @apply bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)];
+    @apply bg-[rgb(var(--accent-rgb)/0.15)] text-[var(--accent)] hover:bg-[rgb(var(--accent-rgb)/0.2)] hover:text-[var(--accent)];
   }
 }
