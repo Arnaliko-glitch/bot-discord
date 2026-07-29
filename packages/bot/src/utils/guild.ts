@@ -48,12 +48,17 @@ export async function createLogEntry(
     metadata?: Prisma.InputJsonValue;
   }
 ) {
-  return prisma.logEntry.create({
-    data: {
-      guildId,
-      type,
-      ...data,
-      metadata: data.metadata ?? undefined,
-    },
-  });
+  return prisma.logEntry
+    .create({
+      data: {
+        guildId,
+        type,
+        ...data,
+        metadata: data.metadata ?? undefined,
+      },
+    })
+    .catch((error) => {
+      console.error(`Log "${type}" impossible pour ${guildId}:`, error);
+      return null;
+    });
 }
