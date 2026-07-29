@@ -14,6 +14,7 @@
     "build": "npm run build -w @discord-bot-dashboard/shared && npm run build -w @discord-bot-dashboard/database && npm run build -w @discord-bot-dashboard/bot && npm run build -w @discord-bot-dashboard/web",
     "db:generate": "npm run generate -w @discord-bot-dashboard/database",
     "db:migrate": "npm run migrate -w @discord-bot-dashboard/database",
+    "db:deploy": "npm run migrate:deploy -w @discord-bot-dashboard/database",
     "db:push": "npm run push -w @discord-bot-dashboard/database",
     "db:seed": "npm run seed -w @discord-bot-dashboard/database",
     "start:bot": "npm run start -w @discord-bot-dashboard/bot",

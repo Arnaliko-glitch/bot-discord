@@ -71,7 +71,21 @@ export const welcomeModule: BotModuleHandler = {
       if (channelId) {
         const channel = member.guild.channels.cache.get(channelId) as TextChannel | undefined;
         if (channel?.isTextBased()) {
-          await channel.send(replacePlaceholders(config.goodbyeMessage, vars)).catch(() => undefined);
+          if (config.goodbyeUseEmbed) {
+            const embed = new EmbedBuilder()
+              .setColor(config.goodbyeEmbedColor as `#${string}`)
+              .setDescription(replacePlaceholders(config.goodbyeEmbedDescription, vars));
+            if (config.goodbyeEmbedTitle) embed.setTitle(replacePlaceholders(config.goodbyeEmbedTitle, vars));
+            if (config.goodbyeEmbedThumbnail && member.user) {
+              embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
+            }
+            if (config.goodbyeEmbedFooter) {
+              embed.setFooter({ text: replacePlaceholders(config.goodbyeEmbedFooter, vars) });
+            }
+            await channel.send({ embeds: [embed] }).catch(() => undefined);
+          } else {
+            await channel.send(replacePlaceholders(config.goodbyeMessage, vars)).catch(() => undefined);
+          }
         }
       }
     });

@@ -17,6 +17,12 @@ interface WelcomeConfig {
   embedThumbnail: boolean;
   embedFooter: string;
   dmWelcome: boolean;
+  goodbyeUseEmbed: boolean;
+  goodbyeEmbedTitle: string;
+  goodbyeEmbedDescription: string;
+  goodbyeEmbedColor: string;
+  goodbyeEmbedThumbnail: boolean;
+  goodbyeEmbedFooter: string;
 }
 
 export function WelcomeConfigPage({ guildId, config }: { guildId: string; config: WelcomeConfig }) {
@@ -57,7 +63,18 @@ export function WelcomeConfigPage({ guildId, config }: { guildId: string; config
         ) : (
           <TextAreaField label="Message de bienvenue" value={data.welcomeMessage} onChange={(v) => update('welcomeMessage', v)} />
         )}
-        <TextAreaField label="Message d'au revoir" value={data.goodbyeMessage} onChange={(v) => update('goodbyeMessage', v)} />
+        <Toggle label="Utiliser un embed pour l'au revoir" checked={data.goodbyeUseEmbed} onChange={(v) => update('goodbyeUseEmbed', v)} />
+        {data.goodbyeUseEmbed ? (
+          <>
+            <InputField label="Titre de l'embed d'au revoir" value={data.goodbyeEmbedTitle ?? ''} onChange={(v) => update('goodbyeEmbedTitle', v)} />
+            <TextAreaField label="Description d'au revoir" value={data.goodbyeEmbedDescription} onChange={(v) => update('goodbyeEmbedDescription', v)} />
+            <InputField label="Couleur d'au revoir" value={data.goodbyeEmbedColor} onChange={(v) => update('goodbyeEmbedColor', v)} type="color" />
+            <InputField label="Pied de page d'au revoir" value={data.goodbyeEmbedFooter ?? ''} onChange={(v) => update('goodbyeEmbedFooter', v)} />
+            <Toggle label="Miniature utilisateur (au revoir)" checked={data.goodbyeEmbedThumbnail} onChange={(v) => update('goodbyeEmbedThumbnail', v)} />
+          </>
+        ) : (
+          <TextAreaField label="Message d'au revoir" value={data.goodbyeMessage} onChange={(v) => update('goodbyeMessage', v)} />
+        )}
         <Toggle label="MP de bienvenue" checked={data.dmWelcome} onChange={(v) => update('dmWelcome', v)} />
         <button onClick={save} className="btn-primary" disabled={saving}>
           {saving ? 'Enregistrement...' : 'Enregistrer'}
