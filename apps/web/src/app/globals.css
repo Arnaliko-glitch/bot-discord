@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0f1117;
+  --foreground: #e4e6eb;
+  --card: #1a1d27;
+  --card-hover: #222633;
+  --border: #2a2f3d;
+  --accent: #5865f2;
+  --accent-hover: #4752c4;
+  --success: #3ba55d;
+  --warning: #faa81a;
+  --danger: #ed4245;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-lg;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--card-hover)];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)];
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-gray-300;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-400 transition hover:bg-[var(--card-hover)] hover:text-white;
+  }
+
+  .sidebar-link-active {
+    @apply bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)];
+  }
+}

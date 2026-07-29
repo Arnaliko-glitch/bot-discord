@@ -1,0 +1,29 @@
+{
+  "name": "discord-bot-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord bot with web dashboard - monorepo",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @discord-bot-dashboard/bot\" \"npm run dev -w @discord-bot-dashboard/web\"",
+    "dev:bot": "npm run dev -w @discord-bot-dashboard/bot",
+    "dev:web": "npm run dev -w @discord-bot-dashboard/web",
+    "build": "npm run build -w @discord-bot-dashboard/shared && npm run build -w @discord-bot-dashboard/database && npm run build -w @discord-bot-dashboard/bot && npm run build -w @discord-bot-dashboard/web",
+    "db:generate": "npm run generate -w @discord-bot-dashboard/database",
+    "db:migrate": "npm run migrate -w @discord-bot-dashboard/database",
+    "db:push": "npm run push -w @discord-bot-dashboard/database",
+    "db:seed": "npm run seed -w @discord-bot-dashboard/database",
+    "start:bot": "npm run start -w @discord-bot-dashboard/bot",
+    "start:web": "npm run start -w @discord-bot-dashboard/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
