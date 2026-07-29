@@ -11,6 +11,7 @@
     "dev": "concurrently \"npm run dev -w @discord-bot-dashboard/bot\" \"npm run dev -w @discord-bot-dashboard/web\"",
     "dev:bot": "npm run dev -w @discord-bot-dashboard/bot",
     "dev:web": "npm run dev -w @discord-bot-dashboard/web",
+    "lint": "npm run lint -w @discord-bot-dashboard/web",
     "build": "npm run build -w @discord-bot-dashboard/shared && npm run build -w @discord-bot-dashboard/database && npm run build -w @discord-bot-dashboard/bot && npm run build -w @discord-bot-dashboard/web",
     "db:generate": "npm run generate -w @discord-bot-dashboard/database",
     "db:migrate": "npm run migrate -w @discord-bot-dashboard/database",
