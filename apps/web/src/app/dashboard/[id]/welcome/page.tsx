@@ -37,6 +37,12 @@ export default async function WelcomePage({ params }: { params: { id: string } }
           embedThumbnail: config.embedThumbnail,
           embedFooter: config.embedFooter ?? '',
           dmWelcome: config.dmWelcome,
+          goodbyeUseEmbed: config.goodbyeUseEmbed,
+          goodbyeEmbedTitle: config.goodbyeEmbedTitle ?? '',
+          goodbyeEmbedDescription: config.goodbyeEmbedDescription,
+          goodbyeEmbedColor: config.goodbyeEmbedColor,
+          goodbyeEmbedThumbnail: config.goodbyeEmbedThumbnail,
+          goodbyeEmbedFooter: config.goodbyeEmbedFooter ?? '',
         }}
       />
     </DashboardShell>

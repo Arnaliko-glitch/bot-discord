@@ -24,6 +24,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
         embedThumbnail: body.embedThumbnail,
         embedFooter: body.embedFooter || null,
         dmWelcome: body.dmWelcome,
+        goodbyeUseEmbed: body.goodbyeUseEmbed,
+        goodbyeEmbedTitle: body.goodbyeEmbedTitle || null,
+        goodbyeEmbedDescription: body.goodbyeEmbedDescription,
+        goodbyeEmbedColor: body.goodbyeEmbedColor,
+        goodbyeEmbedThumbnail: body.goodbyeEmbedThumbnail,
+        goodbyeEmbedFooter: body.goodbyeEmbedFooter || null,
       },
     });
 

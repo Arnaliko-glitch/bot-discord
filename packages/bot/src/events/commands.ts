@@ -32,7 +32,7 @@ const commands = [
 
 export async function registerSlashCommands(client: BotClient) {
   const token = process.env.DISCORD_BOT_TOKEN;
-  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientId = process.env.DISCORD_CLIENT_ID ?? client.application?.id ?? client.user?.id;
   if (!token || !clientId) return;
 
   const rest = new REST({ version: '10' }).setToken(token);

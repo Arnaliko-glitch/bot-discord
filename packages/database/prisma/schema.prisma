@@ -66,6 +66,14 @@ model WelcomeConfig {
   embedThumbnail   Boolean  @default(true)
   embedFooter      String?
   dmWelcome        Boolean  @default(false)
+
+  goodbyeUseEmbed         Boolean @default(false)
+  goodbyeEmbedTitle       String?
+  goodbyeEmbedDescription String  @default("{username} a quitté **{server}**.")
+  goodbyeEmbedColor       String  @default("#ed4245")
+  goodbyeEmbedThumbnail   Boolean @default(true)
+  goodbyeEmbedFooter      String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -83,6 +91,9 @@ model TicketConfig {
   maxOpenPerUser      Int      @default(1)
   closeConfirmation   Boolean  @default(true)
   transcriptEnabled   Boolean  @default(true)
+  transcriptChannelId String?
+  deleteOnClose       Boolean  @default(false)
+  deleteDelaySeconds  Int      @default(10)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }

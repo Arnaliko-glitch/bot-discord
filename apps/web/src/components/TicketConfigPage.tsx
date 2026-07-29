@@ -13,6 +13,9 @@ interface TicketConfig {
   maxOpenPerUser: number;
   closeConfirmation: boolean;
   transcriptEnabled: boolean;
+  transcriptChannelId: string;
+  deleteOnClose: boolean;
+  deleteDelaySeconds: number;
 }
 
 export function TicketConfigPage({ guildId, config }: { guildId: string; config: TicketConfig }) {
@@ -45,6 +48,23 @@ export function TicketConfigPage({ guildId, config }: { guildId: string; config:
       <InputField label="Max tickets par utilisateur" value={data.maxOpenPerUser} onChange={(v) => update('maxOpenPerUser', Number(v))} type="number" />
       <Toggle label="Confirmation de fermeture" checked={data.closeConfirmation} onChange={(v) => update('closeConfirmation', v)} />
       <Toggle label="Transcripts activés" checked={data.transcriptEnabled} onChange={(v) => update('transcriptEnabled', v)} />
+      {data.transcriptEnabled && (
+        <InputField
+          label="Salon d'archivage des transcripts (ID)"
+          value={data.transcriptChannelId}
+          onChange={(v) => update('transcriptChannelId', v)}
+          placeholder="Par défaut : salon de logs"
+        />
+      )}
+      <Toggle label="Supprimer le salon après fermeture" checked={data.deleteOnClose} onChange={(v) => update('deleteOnClose', v)} />
+      {data.deleteOnClose && (
+        <InputField
+          label="Délai avant suppression (secondes)"
+          value={data.deleteDelaySeconds}
+          onChange={(v) => update('deleteDelaySeconds', Number(v))}
+          type="number"
+        />
+      )}
       <button onClick={save} className="btn-primary" disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
       {message && <p className="text-sm">{message}</p>}
     </div>

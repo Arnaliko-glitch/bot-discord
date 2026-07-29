@@ -21,6 +21,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
         maxOpenPerUser: body.maxOpenPerUser,
         closeConfirmation: body.closeConfirmation,
         transcriptEnabled: body.transcriptEnabled,
+        transcriptChannelId: body.transcriptChannelId || null,
+        deleteOnClose: body.deleteOnClose,
+        deleteDelaySeconds: body.deleteDelaySeconds,
       },
     });
 

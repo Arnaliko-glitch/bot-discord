@@ -34,6 +34,9 @@ export default async function TicketsPage({ params }: { params: { id: string } }
           maxOpenPerUser: config.maxOpenPerUser,
           closeConfirmation: config.closeConfirmation,
           transcriptEnabled: config.transcriptEnabled,
+          transcriptChannelId: config.transcriptChannelId ?? '',
+          deleteOnClose: config.deleteOnClose,
+          deleteDelaySeconds: config.deleteDelaySeconds,
         }}
       />
     </DashboardShell>

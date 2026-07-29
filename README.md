@@ -88,8 +88,9 @@ npm run db:generate
 Assurez-vous que PostgreSQL tourne, puis :
 
 ```bash
-npm run db:push
-npm run db:seed   # optionnel — données de démo
+npm run db:deploy   # applique les migrations (recommandé)
+# ou npm run db:push pour un schéma sans historique de migration
+npm run db:seed     # optionnel — données de démo
 ```
 
 ### 4. Lancer en développement
@@ -151,8 +152,8 @@ pm2 restart all
 
 | Module | Description |
 |--------|-------------|
-| 🎨 Welcome | Messages bienvenue/au revoir avec aperçu live |
-| 🎫 Tickets | Configuration catégorie, rôle support, panel |
+| 🎨 Welcome | Messages bienvenue/au revoir (texte ou embed) avec aperçu live |
+| 🎫 Tickets | Catégorie, rôle support, salon du panel, confirmation de fermeture, transcripts, suppression auto du salon |
 | ⭐ XP | XP min/max, cooldown, annonces level-up |
 | 🏅 Rôles niveau | Attribution automatique par palier |
 | 🤖 Modules | Activer/désactiver chaque module |
@@ -193,7 +194,8 @@ Voir `.env.example` pour la liste complète.
 ```bash
 npm run dev          # Dev bot + web
 npm run build        # Build production
-npm run db:migrate   # Migrations Prisma
+npm run db:migrate   # Créer/appliquer une migration (dev)
+npm run db:deploy    # Appliquer les migrations (prod)
 npm run db:studio    # Interface Prisma Studio
 npm run start:bot    # Bot production
 npm run start:web    # Web production

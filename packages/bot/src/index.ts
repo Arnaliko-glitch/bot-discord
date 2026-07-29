@@ -1,7 +1,12 @@
-import 'dotenv/config';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { config as loadEnv } from 'dotenv';
 import { BotClient } from './client.js';
 import { loadModules } from './modules/loader.js';
 import { registerEvents } from './events/register.js';
+
+loadEnv();
+loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env') });
 
 async function main() {
   const token = process.env.DISCORD_BOT_TOKEN;
