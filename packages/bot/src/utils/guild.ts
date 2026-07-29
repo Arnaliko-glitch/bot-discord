@@ -1,5 +1,5 @@
 import type { BotClient } from '../client.js';
-import { prisma } from '@discord-bot-dashboard/database';
+import { prisma, type Prisma } from '@discord-bot-dashboard/database';
 import { BOT_MODULES } from '@discord-bot-dashboard/shared';
 
 export async function ensureGuild(guildId: string, name: string, ownerId: string, icon?: string | null) {
@@ -45,7 +45,7 @@ export async function createLogEntry(
     targetName?: string;
     channelId?: string;
     reason?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: Prisma.InputJsonValue;
   }
 ) {
   return prisma.logEntry.create({
