@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: Params) {
       totalXp: totalXp._sum.xp ?? 0,
       activeUsers: userXpCount,
       logsToday,
-      enabledModules: modules.filter((m) => m.enabled).length,
+      enabledModules: modules.filter((m: { enabled: boolean }) => m.enabled).length,
     });
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

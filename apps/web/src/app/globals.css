@@ -49,6 +49,12 @@ body {
   }
 
   .sidebar-link-active {
-    @apply bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)];
+    background-color: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+
+  .sidebar-link-active:hover {
+    background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent);
   }
 }
