@@ -4,7 +4,7 @@ import { prisma } from '@discord-bot-dashboard/database';
 
 export async function applyLevelRoles(guild: Guild, member: GuildMember, level: number) {
   const { prisma: db } = await import('@discord-bot-dashboard/database');
-  const levelRoles = await db.levelRole.findMany({
+  const levelRoles: Awaited<ReturnType<typeof db.levelRole.findMany>> = await db.levelRole.findMany({
     where: { guildId: guild.id, level: { lte: level } },
     orderBy: { level: 'asc' },
   });
@@ -15,8 +15,8 @@ export async function applyLevelRoles(guild: Guild, member: GuildMember, level: 
   const stackRoles = xpSettings?.stackRoles ?? false;
 
   const rolesToAdd = stackRoles
-    ? levelRoles.map((lr) => lr.roleId)
-    : [levelRoles[levelRoles.length - 1]!.roleId];
+  ? levelRoles.map((lr: { roleId: string }) => lr.roleId)
+  : [levelRoles[levelRoles.length - 1]!.roleId];
 
   for (const roleId of rolesToAdd) {
     const role = guild.roles.cache.get(roleId);
