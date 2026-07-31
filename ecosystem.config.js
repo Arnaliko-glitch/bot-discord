@@ -10,13 +10,18 @@ module.exports = {
       max_memory_restart: '512M',
       env: {
         NODE_ENV: 'production',
+        DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+        DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+        DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+        DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
+        DATABASE_URL: process.env.DATABASE_URL,
       },
     },
+
     {
       name: 'discord-web',
       cwd: './apps/web',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start -p 3000',
+      script: '.next/standalone/apps/web/server.js',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -24,6 +29,16 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        HOSTNAME: '0.0.0.0',
+
+        DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+        DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+        DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
+
+        NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+
+        DATABASE_URL: process.env.DATABASE_URL,
+        SESSION_SECRET: process.env.SESSION_SECRET,
       },
     },
   ],

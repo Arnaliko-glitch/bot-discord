@@ -7,8 +7,10 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get('state');
   const storedState = cookies().get('oauth_state')?.value;
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://37.187.98.86';
+
   if (!code || !state || state !== storedState) {
-    return NextResponse.redirect(new URL('/?error=auth', request.url));
+    return NextResponse.redirect(new URL('/?error=auth', appUrl));
   }
 
   try {
@@ -30,10 +32,12 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
+
     cookies().delete('oauth_state');
 
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/dashboard', appUrl));
+
   } catch {
-    return NextResponse.redirect(new URL('/?error=auth', request.url));
+    return NextResponse.redirect(new URL('/?error=auth', appUrl));
   }
 }
