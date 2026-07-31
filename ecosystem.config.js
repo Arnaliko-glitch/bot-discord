@@ -5,6 +5,7 @@ module.exports = {
       cwd: './packages/bot',
       script: 'dist/index.js',
       instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
@@ -17,12 +18,12 @@ module.exports = {
         DATABASE_URL: process.env.DATABASE_URL,
       },
     },
-
     {
       name: 'discord-web',
       cwd: './apps/web',
       script: '.next/standalone/apps/web/server.js',
       instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
@@ -30,13 +31,10 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         HOSTNAME: '0.0.0.0',
-
         DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
         DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
         DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
-
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-
         DATABASE_URL: process.env.DATABASE_URL,
         SESSION_SECRET: process.env.SESSION_SECRET,
       },
