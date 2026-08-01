@@ -11,10 +11,8 @@ export default async function WelcomePage({ params }: { params: { id: string } }
   } catch {
     notFound();
   }
-
   const config = await prisma.welcomeConfig.findUnique({ where: { guildId: params.id } });
   if (!config) notFound();
-
   return (
     <DashboardShell
       guild={{ id: access.dbGuild.id, name: access.dbGuild.name, icon: access.dbGuild.icon }}
@@ -36,6 +34,12 @@ export default async function WelcomePage({ params }: { params: { id: string } }
           embedColor: config.embedColor,
           embedThumbnail: config.embedThumbnail,
           embedFooter: config.embedFooter ?? '',
+          goodbyeUseEmbed: config.goodbyeUseEmbed,
+          goodbyeEmbedTitle: config.goodbyeEmbedTitle ?? '',
+          goodbyeEmbedDescription: config.goodbyeEmbedDescription,
+          goodbyeEmbedColor: config.goodbyeEmbedColor,
+          goodbyeEmbedThumbnail: config.goodbyeEmbedThumbnail,
+          goodbyeEmbedFooter: config.goodbyeEmbedFooter ?? '',
           dmWelcome: config.dmWelcome,
         }}
       />

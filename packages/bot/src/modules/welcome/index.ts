@@ -9,24 +9,19 @@ export const welcomeModule: BotModuleHandler = {
   register(client: BotClient) {
     client.on('guildMemberAdd', async (member) => {
       if (!(await client.isModuleEnabled(member.guild.id, 'welcome'))) return;
-
       await ensureGuild(member.guild.id, member.guild.name, member.guild.ownerId, member.guild.iconURL());
-
       const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
       if (!config?.enabled) return;
-
       await createLogEntry(member.guild.id, 'member_join', {
         actorId: member.id,
         actorName: member.user.tag,
       });
-
       const vars = {
         user: `<@${member.id}>`,
         username: member.user.username,
         server: member.guild.name,
         memberCount: member.guild.memberCount,
       };
-
       if (config.channelId) {
         const channel = member.guild.channels.cache.get(config.channelId) as TextChannel | undefined;
         if (channel?.isTextBased()) {
@@ -43,7 +38,6 @@ export const welcomeModule: BotModuleHandler = {
           }
         }
       }
-
       if (config.dmWelcome) {
         await member.send(replacePlaceholders(config.welcomeMessage, vars)).catch(() => undefined);
       }
@@ -51,27 +45,35 @@ export const welcomeModule: BotModuleHandler = {
 
     client.on('guildMemberRemove', async (member) => {
       if (!(await client.isModuleEnabled(member.guild.id, 'welcome'))) return;
-
       const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
       if (!config?.enabled) return;
-
       await createLogEntry(member.guild.id, 'member_leave', {
         actorId: member.id,
         actorName: member.user?.tag ?? 'Unknown',
       });
-
       const vars = {
         user: member.user?.username ?? 'Unknown',
         username: member.user?.username ?? 'Unknown',
         server: member.guild.name,
         memberCount: member.guild.memberCount,
       };
-
       const channelId = config.goodbyeChannelId ?? config.channelId;
       if (channelId) {
         const channel = member.guild.channels.cache.get(channelId) as TextChannel | undefined;
         if (channel?.isTextBased()) {
-          await channel.send(replacePlaceholders(config.goodbyeMessage, vars)).catch(() => undefined);
+          if (config.goodbyeUseEmbed) {
+            const embed = new EmbedBuilder()
+              .setColor(config.goodbyeEmbedColor as `#${string}`)
+              .setDescription(replacePlaceholders(config.goodbyeEmbedDescription, vars));
+            if (config.goodbyeEmbedTitle) embed.setTitle(replacePlaceholders(config.goodbyeEmbedTitle, vars));
+            if (config.goodbyeEmbedThumbnail && member.user) {
+              embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
+            }
+            if (config.goodbyeEmbedFooter) embed.setFooter({ text: replacePlaceholders(config.goodbyeEmbedFooter, vars) });
+            await channel.send({ embeds: [embed] }).catch(() => undefined);
+          } else {
+            await channel.send(replacePlaceholders(config.goodbyeMessage, vars)).catch(() => undefined);
+          }
         }
       }
     });

@@ -1,4 +1,3 @@
-'use client';
 import { replacePlaceholders } from './welcome-preview-utils';
 import type { Channel } from './ChannelSelect';
 
@@ -9,6 +8,7 @@ interface Props {
   footer: string | null;
   thumbnail?: boolean;
   channels?: Channel[];
+  label?: string;
 }
 
 function resolveChannelMentions(text: string, channels: Channel[]) {
@@ -18,7 +18,15 @@ function resolveChannelMentions(text: string, channels: Channel[]) {
   });
 }
 
-export function WelcomePreview({ title, description, color, footer, thumbnail = true, channels = [] }: Props) {
+export function WelcomePreview({
+  title,
+  description,
+  color,
+  footer,
+  thumbnail = true,
+  channels = [],
+  label = 'Aperçu en direct',
+}: Props) {
   const vars = { user: '@Remi', username: 'Remi', server: 'Mon Serveur', memberCount: 1337 };
 
   const previewDesc = resolveChannelMentions(replacePlaceholders(description, vars), channels);
@@ -27,7 +35,7 @@ export function WelcomePreview({ title, description, color, footer, thumbnail = 
 
   return (
     <div className="card sticky top-8">
-      <h3 className="mb-4 font-semibold">Aperçu en direct</h3>
+      <h3 className="mb-4 font-semibold">{label}</h3>
       <div className="overflow-hidden rounded-lg border-l-4 bg-[#2f3136] p-4" style={{ borderColor: color }}>
         <div className="flex gap-4">
           {thumbnail && (

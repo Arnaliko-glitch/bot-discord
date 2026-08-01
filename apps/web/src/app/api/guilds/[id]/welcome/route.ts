@@ -8,7 +8,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   try {
     await requireGuildAccess(params.id);
     const body = await request.json();
-
     await prisma.welcomeConfig.update({
       where: { guildId: params.id },
       data: {
@@ -23,10 +22,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
         embedColor: body.embedColor,
         embedThumbnail: body.embedThumbnail,
         embedFooter: body.embedFooter || null,
+        goodbyeUseEmbed: body.goodbyeUseEmbed,
+        goodbyeEmbedTitle: body.goodbyeEmbedTitle || null,
+        goodbyeEmbedDescription: body.goodbyeEmbedDescription,
+        goodbyeEmbedColor: body.goodbyeEmbedColor,
+        goodbyeEmbedThumbnail: body.goodbyeEmbedThumbnail,
+        goodbyeEmbedFooter: body.goodbyeEmbedFooter || null,
         dmWelcome: body.dmWelcome,
       },
     });
-
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 403 });
