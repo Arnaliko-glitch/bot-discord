@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { WelcomePreview } from '@/components/WelcomePreview';
 import { Toggle, InputField } from '@/components/ConfigForm';
