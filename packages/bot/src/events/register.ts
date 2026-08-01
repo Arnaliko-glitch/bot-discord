@@ -4,14 +4,12 @@ import { registerSlashCommands } from './commands.js';
 
 export function registerEvents(client: BotClient) {
   client.on('guildCreate', async (guild) => {
-    await ensureGuild(guild.id, guild.name, guild.ownerId, guild.iconURL());
+    await ensureGuild(guild.id, guild.name, guild.ownerId, guild.icon);
     console.log(`➕ Rejoint: ${guild.name}`);
   });
-
   client.on('guildDelete', (guild) => {
     console.log(`➖ Quitté: ${guild.name}`);
   });
-
   client.once('ready', async () => {
     await registerSlashCommands(client);
   });

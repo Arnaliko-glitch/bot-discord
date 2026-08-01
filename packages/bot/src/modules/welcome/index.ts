@@ -9,7 +9,7 @@ export const welcomeModule: BotModuleHandler = {
   register(client: BotClient) {
     client.on('guildMemberAdd', async (member) => {
       if (!(await client.isModuleEnabled(member.guild.id, 'welcome'))) return;
-      await ensureGuild(member.guild.id, member.guild.name, member.guild.ownerId, member.guild.iconURL());
+      await ensureGuild(member.guild.id, member.guild.name, member.guild.ownerId, member.guild.icon);
       const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
       if (!config?.enabled) return;
       await createLogEntry(member.guild.id, 'member_join', {
@@ -42,7 +42,6 @@ export const welcomeModule: BotModuleHandler = {
         await member.send(replacePlaceholders(config.welcomeMessage, vars)).catch(() => undefined);
       }
     });
-
     client.on('guildMemberRemove', async (member) => {
       if (!(await client.isModuleEnabled(member.guild.id, 'welcome'))) return;
       const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
