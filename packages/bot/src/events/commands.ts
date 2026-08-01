@@ -9,8 +9,7 @@ const commands = [
     .addSubcommand((sub) => sub.setName('close').setDescription('Fermer le ticket actuel')),
   new SlashCommandBuilder()
     .setName('rank')
-    .setDescription('Voir le niveau XP')
-    .addUserOption((opt) => opt.setName('user').setDescription('Utilisateur')),
+    .setDescription('Voir le niveau XP'),
   new SlashCommandBuilder()
     .setName('modules')
     .setDescription('Activer/désactiver un module (admin)')

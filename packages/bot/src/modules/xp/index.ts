@@ -69,7 +69,7 @@ export const xpModule: BotModuleHandler = {
       if (interaction.commandName !== 'rank') return;
       if (!(await client.isModuleEnabled(interaction.guild.id, 'xp'))) return;
 
-      const target = interaction.options.getUser('user') ?? interaction.user;
+      const target = interaction.user;
       const data = await prisma.userXp.findUnique({
         where: { guildId_discordUserId: { guildId: interaction.guild.id, discordUserId: target.id } },
       });

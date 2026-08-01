@@ -4,7 +4,6 @@ export type BotModule =
   | 'xp'
   | 'levelRoles'
   | 'logging';
-
 export const BOT_MODULES: BotModule[] = [
   'welcome',
   'tickets',
@@ -12,7 +11,6 @@ export const BOT_MODULES: BotModule[] = [
   'levelRoles',
   'logging',
 ];
-
 export const MODULE_LABELS: Record<BotModule, string> = {
   welcome: 'Messages de bienvenue',
   tickets: 'Système de tickets',
@@ -20,7 +18,6 @@ export const MODULE_LABELS: Record<BotModule, string> = {
   levelRoles: 'Rôles par niveau',
   logging: 'Logs de modération',
 };
-
 export type LogType =
   | 'message_delete'
   | 'message_edit'
@@ -31,9 +28,7 @@ export type LogType =
   | 'ticket_close'
   | 'ticket_reopen'
   | 'level_up';
-
 export type DashboardPermissionLevel = 'owner' | 'admin' | 'moderator';
-
 export interface DiscordGuildSummary {
   id: string;
   name: string;
@@ -41,7 +36,6 @@ export interface DiscordGuildSummary {
   owner: boolean;
   permissions: string;
 }
-
 export interface SessionUser {
   id: string;
   username: string;
@@ -49,7 +43,6 @@ export interface SessionUser {
   avatar: string | null;
   accessToken: string;
 }
-
 export interface WelcomePreview {
   title: string | null;
   description: string;
@@ -57,7 +50,6 @@ export interface WelcomePreview {
   thumbnailUrl: string | null;
   footer: string | null;
 }
-
 export interface GuildStats {
   memberCount: number;
   ticketCount: number;
@@ -66,7 +58,6 @@ export interface GuildStats {
   activeUsers: number;
   logsToday: number;
 }
-
 export interface XpUserSummary {
   discordUserId: string;
   username: string;
@@ -75,11 +66,10 @@ export interface XpUserSummary {
   level: number;
   messageCount: number;
 }
-
 export function xpForLevel(level: number): number {
+  if (level <= 0) return 0;
   return 5 * level * level + 50 * level + 100;
 }
-
 export function levelFromXp(xp: number): number {
   let level = 0;
   while (xp >= xpForLevel(level + 1)) {
@@ -87,7 +77,6 @@ export function levelFromXp(xp: number): number {
   }
   return level;
 }
-
 export function xpProgress(xp: number): { level: number; current: number; needed: number; percent: number } {
   const level = levelFromXp(xp);
   const currentLevelXp = xpForLevel(level);
