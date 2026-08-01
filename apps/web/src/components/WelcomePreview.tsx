@@ -1,6 +1,6 @@
 'use client';
-
 import { replacePlaceholders } from './welcome-preview-utils';
+import type { Channel } from './ChannelSelect';
 
 interface Props {
   title: string | null;
@@ -8,21 +8,22 @@ interface Props {
   color: string;
   footer: string | null;
   thumbnail?: boolean;
+  channels?: Channel[];
 }
 
-export function WelcomePreview({ title, description, color, footer, thumbnail = true }: Props) {
-  const previewDesc = replacePlaceholders(description, {
-    user: '@Remi',
-    username: 'Remi',
-    server: 'Mon Serveur',
-    memberCount: 1337,
+function resolveChannelMentions(text: string, channels: Channel[]) {
+  return text.replace(/<#(\d+)>/g, (match, id) => {
+    const channel = channels.find((c) => c.id === id);
+    return channel ? `#${channel.name}` : match;
   });
-  const previewTitle = title
-    ? replacePlaceholders(title, { user: '@Remi', username: 'Remi', server: 'Mon Serveur', memberCount: 1337 })
-    : null;
-  const previewFooter = footer
-    ? replacePlaceholders(footer, { user: '@Remi', username: 'Remi', server: 'Mon Serveur', memberCount: 1337 })
-    : null;
+}
+
+export function WelcomePreview({ title, description, color, footer, thumbnail = true, channels = [] }: Props) {
+  const vars = { user: '@Remi', username: 'Remi', server: 'Mon Serveur', memberCount: 1337 };
+
+  const previewDesc = resolveChannelMentions(replacePlaceholders(description, vars), channels);
+  const previewTitle = title ? resolveChannelMentions(replacePlaceholders(title, vars), channels) : null;
+  const previewFooter = footer ? resolveChannelMentions(replacePlaceholders(footer, vars), channels) : null;
 
   return (
     <div className="card sticky top-8">
