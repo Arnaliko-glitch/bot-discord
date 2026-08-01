@@ -20,9 +20,9 @@ export default async function HomePage() {
             </div>
             <span className="text-lg font-bold">Bot Dashboard</span>
           </div>
-          <Link href="/api/auth/login" className="btn-primary">
+          <a href="/api/auth/login" className="btn-primary">
             Connexion Discord
-          </Link>
+          </a>
         </div>
       </header>
 
@@ -37,9 +37,9 @@ export default async function HomePage() {
           <p className="mx-auto mb-10 max-w-2xl text-lg text-gray-400">
             Welcome messages, tickets, système XP, rôles par niveau, logs de modération — tout depuis une interface moderne.
           </p>
-          <Link href="/api/auth/login" className="btn-primary px-8 py-3 text-base">
+          <a href="/api/auth/login" className="btn-primary px-8 py-3 text-base">
             Commencer gratuitement
-          </Link>
+          </a>
         </section>
 
         <section className="border-t border-[var(--border)] bg-[var(--card)]/30 py-20">
