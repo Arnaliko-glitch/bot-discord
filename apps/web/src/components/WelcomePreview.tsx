@@ -5,7 +5,6 @@ interface Props {
   title: string | null;
   description: string;
   color: string;
-  footer: string | null;
   thumbnail?: boolean;
   channels?: Channel[];
   label?: string;
@@ -22,7 +21,6 @@ export function WelcomePreview({
   title,
   description,
   color,
-  footer,
   thumbnail = true,
   channels = [],
   label = 'Aperçu en direct',
@@ -31,7 +29,6 @@ export function WelcomePreview({
 
   const previewDesc = resolveChannelMentions(replacePlaceholders(description, vars), channels);
   const previewTitle = title ? resolveChannelMentions(replacePlaceholders(title, vars), channels) : null;
-  const previewFooter = footer ? resolveChannelMentions(replacePlaceholders(footer, vars), channels) : null;
 
   return (
     <div className="card sticky top-8">
@@ -48,7 +45,6 @@ export function WelcomePreview({
           <div className="min-w-0 flex-1">
             {previewTitle && <p className="mb-1 font-semibold text-white">{previewTitle}</p>}
             <p className="whitespace-pre-wrap text-sm text-[#dcddde]">{previewDesc}</p>
-            {previewFooter && <p className="mt-2 text-xs text-gray-500">{previewFooter}</p>}
           </div>
         </div>
       </div>
