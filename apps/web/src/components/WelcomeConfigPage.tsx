@@ -154,7 +154,6 @@ export function WelcomeConfigPage({ guildId, config }: { guildId: string; config
           title={data.useEmbed ? data.embedTitle : null}
           description={data.useEmbed ? data.embedDescription : data.welcomeMessage}
           color={data.embedColor}
-          footer={data.useEmbed ? data.embedFooter : null}
           thumbnail={data.useEmbed && data.embedThumbnail}
           channels={channels}
         />
@@ -163,7 +162,6 @@ export function WelcomeConfigPage({ guildId, config }: { guildId: string; config
           title={data.goodbyeUseEmbed ? data.goodbyeEmbedTitle : null}
           description={data.goodbyeUseEmbed ? data.goodbyeEmbedDescription : data.goodbyeMessage}
           color={data.goodbyeEmbedColor}
-          footer={data.goodbyeUseEmbed ? data.goodbyeEmbedFooter : null}
           thumbnail={data.goodbyeUseEmbed && data.goodbyeEmbedThumbnail}
           channels={channels}
         />
