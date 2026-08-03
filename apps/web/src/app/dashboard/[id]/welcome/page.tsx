@@ -33,13 +33,11 @@ export default async function WelcomePage({ params }: { params: { id: string } }
           embedDescription: config.embedDescription,
           embedColor: config.embedColor,
           embedThumbnail: config.embedThumbnail,
-          embedFooter: config.embedFooter ?? '',
           goodbyeUseEmbed: config.goodbyeUseEmbed,
           goodbyeEmbedTitle: config.goodbyeEmbedTitle ?? '',
           goodbyeEmbedDescription: config.goodbyeEmbedDescription,
           goodbyeEmbedColor: config.goodbyeEmbedColor,
           goodbyeEmbedThumbnail: config.goodbyeEmbedThumbnail,
-          goodbyeEmbedFooter: config.goodbyeEmbedFooter ?? '',
           dmWelcome: config.dmWelcome,
         }}
       />
