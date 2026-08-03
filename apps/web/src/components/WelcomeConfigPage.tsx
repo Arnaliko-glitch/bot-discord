@@ -16,13 +16,11 @@ interface WelcomeConfig {
   embedDescription: string;
   embedColor: string;
   embedThumbnail: boolean;
-  embedFooter: string;
   goodbyeUseEmbed: boolean;
   goodbyeEmbedTitle: string;
   goodbyeEmbedDescription: string;
   goodbyeEmbedColor: string;
   goodbyeEmbedThumbnail: boolean;
-  goodbyeEmbedFooter: string;
   dmWelcome: boolean;
 }
 
@@ -94,13 +92,6 @@ export function WelcomeConfigPage({ guildId, config }: { guildId: string; config
                 channels={channels}
               />
               <InputField label="Couleur" value={data.embedColor} onChange={(v) => update('embedColor', v)} type="color" />
-              <MessageEditor
-                label="Pied de page"
-                value={data.embedFooter ?? ''}
-                onChange={(v) => update('embedFooter', v)}
-                channels={channels}
-                rows={2}
-              />
               <Toggle label="Miniature utilisateur" checked={data.embedThumbnail} onChange={(v) => update('embedThumbnail', v)} />
             </>
           ) : (
@@ -139,13 +130,6 @@ export function WelcomeConfigPage({ guildId, config }: { guildId: string; config
                 channels={channels}
               />
               <InputField label="Couleur" value={data.goodbyeEmbedColor} onChange={(v) => update('goodbyeEmbedColor', v)} type="color" />
-              <MessageEditor
-                label="Pied de page"
-                value={data.goodbyeEmbedFooter ?? ''}
-                onChange={(v) => update('goodbyeEmbedFooter', v)}
-                channels={channels}
-                rows={2}
-              />
               <Toggle label="Miniature utilisateur" checked={data.goodbyeEmbedThumbnail} onChange={(v) => update('goodbyeEmbedThumbnail', v)} />
             </>
           ) : (
