@@ -31,7 +31,10 @@ export const welcomeModule: BotModuleHandler = {
               .setDescription(replacePlaceholders(config.embedDescription, vars));
             if (config.embedTitle) embed.setTitle(replacePlaceholders(config.embedTitle, vars));
             if (config.embedThumbnail) embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
-            if (config.embedFooter) embed.setFooter({ text: replacePlaceholders(config.embedFooter, vars) });
+            embed.setFooter({
+              text: client.user!.username,
+              iconURL: client.user!.displayAvatarURL(),
+            }).setTimestamp();
             await channel.send({ embeds: [embed] }).catch(() => undefined);
           } else {
             await channel.send(replacePlaceholders(config.welcomeMessage, vars)).catch(() => undefined);
@@ -68,7 +71,10 @@ export const welcomeModule: BotModuleHandler = {
             if (config.goodbyeEmbedThumbnail && member.user) {
               embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
             }
-            if (config.goodbyeEmbedFooter) embed.setFooter({ text: replacePlaceholders(config.goodbyeEmbedFooter, vars) });
+            embed.setFooter({
+              text: client.user!.username,
+              iconURL: client.user!.displayAvatarURL(),
+            }).setTimestamp();
             await channel.send({ embeds: [embed] }).catch(() => undefined);
           } else {
             await channel.send(replacePlaceholders(config.goodbyeMessage, vars)).catch(() => undefined);
