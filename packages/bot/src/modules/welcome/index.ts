@@ -51,7 +51,7 @@ export const welcomeModule: BotModuleHandler = {
         actorName: member.user?.tag ?? 'Unknown',
       });
       const vars = {
-        user: member.user?.username ?? 'Unknown',
+        user: `<@${member.id}>`,
         username: member.user?.username ?? 'Unknown',
         server: member.guild.name,
         memberCount: member.guild.memberCount,
