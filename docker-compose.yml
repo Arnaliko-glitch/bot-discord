@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-discord_dashboard}
+      POSTGRES_USER: ${POSTGRES_USER:-discord_dashboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-discord_dashboard}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Toujours le nom du service Postgres en Docker, indépendamment de la
+      # valeur de développement local (localhost) dans le .env.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-discord_dashboard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-discord_dashboard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/apps/web/public/uploads
+    expose:
+      - '3000'
+
+  bot:
+    build:
+      context: .
+      target: bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-discord_dashboard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-discord_dashboard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Applique le schéma Prisma à la base — ne démarre jamais avec `docker
+  # compose up` (profil dédié), à lancer manuellement : voir README.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-discord_dashboard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-discord_dashboard}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ['tools']
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - '${NGINX_PORT:-80}:80'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -1,5 +1,11 @@
+// Sortie personnalisée (au lieu du node_modules/.prisma/client par défaut) :
+// un déploiement isolé (pnpm deploy, utilisé par le Dockerfile du bot) ne
+// propage pas fiablement ce dossier "caché" dans node_modules — en le
+// générant comme un fichier normal du package, il suit automatiquement
+// n'importe quel mécanisme de copie/déploiement.
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/client"
 }
 
 datasource db {
