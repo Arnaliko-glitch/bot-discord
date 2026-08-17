@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { randomBytes } from 'crypto';
-import { COOKIE_NAME, createSession, exchangeCode, fetchDiscordUser, getDiscordAuthUrl } from '@/lib/auth';
 
 export async function GET() {
-  const state = randomBytes(16).toString('hex');
-  const isHttps = (process.env.NEXT_PUBLIC_APP_URL || '').startsWith('https://');
-  cookies().set('oauth_state', state, { httpOnly: true, secure: isHttps, sameSite: 'lax', maxAge: 600, path: '/' });
-  return NextResponse.redirect(getDiscordAuthUrl(state));
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const redirectUri = process.env.DISCORD_REDIRECT_URI;
+  if (!clientId || !redirectUri) {
+    return NextResponse.json({ error: 'Configuration Discord manquante' }, { status: 500 });
+  }
+
+  const url = new URL('https://discord.com/oauth2/authorize');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', 'identify guilds');
+
+  return NextResponse.redirect(url);
 }

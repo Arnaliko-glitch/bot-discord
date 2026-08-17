@@ -10,3 +10,4 @@ Thumbs.db
 .turbo/
 coverage/
 *.tsbuildinfo
+apps/web/public/uploads/

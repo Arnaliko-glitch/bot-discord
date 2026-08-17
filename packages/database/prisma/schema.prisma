@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Guild {
+  id                  String                @id
+  name                String
+  icon                String?
+  ownerId             String
+  joinedAt            DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  DashboardPermission DashboardPermission[]
+  GuildSettings       GuildSettings?
+  LevelRole           LevelRole[]
+  LogEntry            LogEntry[]
+  SavedMessage        SavedMessage[]
+  Ticket              Ticket[]
+  TicketConfig        TicketConfig?
+  TicketRequest       TicketRequest[]
+  UserXp              UserXp[]
+  welcomeConfig       WelcomeConfig?
+  XpSettings          XpSettings?
+}
+
+model WelcomeConfig {
+  id                       String   @id @default(cuid())
+  guildId                  String   @unique
+  enabled                  Boolean  @default(true)
+  channelId                String?
+  goodbyeChannelId         String?
+  message                  String   @default("Bienvenue {user} sur **{server}** ! Tu es le membre n°{server.membercount}.")
+  goodbyeMessage           String   @default("{user} a quitté **{server}**.")
+  sidebarColor             String   @default("#dc2626")
+  goodbyeSidebarColor      String   @default("#dc2626")
+  dmWelcome                Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  mentionUser              Boolean  @default(true)
+  backgroundColor          String   @default("#57F287")
+  backgroundImage          String?
+  goodbyeEnabled           Boolean  @default(false)
+  goodbyeMentionUser       Boolean  @default(false)
+  goodbyeBackgroundColor   String   @default("#ED4245")
+  goodbyeBackgroundImage   String?
+  useEmbed                 Boolean  @default(true)
+  embedTitle               String?
+  embedFooter              String?
+  goodbyeUseEmbed          Boolean  @default(true)
+  goodbyeEmbedTitle        String?
+  goodbyeEmbedFooter       String?
+  backgroundOverlay        Boolean  @default(true)
+  goodbyeBackgroundOverlay Boolean  @default(true)
+  moduleEnabled            Boolean  @default(false)
+  guild                    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model DashboardPermission {
+  id        String   @id
+  guildId   String
+  addedBy   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  name      String
+  targetId  String
+  type      String   @default("member")
+  username  String?
+  avatar    String?
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, targetId])
+}
+
+model GuildSettings {
+  id              String   @id
+  guildId         String   @unique
+  logChannelId    String?
+  modLogChannelId String?
+  locale          String   @default("fr")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  Guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model LevelRole {
+  id        String   @id
+  guildId   String
+  level     Int
+  roleId    String
+  createdAt DateTime @default(now())
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, level])
+}
+
+model LogEntry {
+  id         String   @id
+  guildId    String
+  type       String
+  actorId    String?
+  actorName  String?
+  targetId   String?
+  targetName String?
+  channelId  String?
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  Guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+  @@index([guildId, type])
+}
+
+model SavedMessage {
+  id                String   @id
+  guildId           String
+  name              String
+  channelId         String?
+  content           String?
+  embedData         Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  lastSentChannelId String?
+  lastSentMessageId String?
+  buttons           Json?
+  imageUrls         String[] @default([])
+  Guild             Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model Ticket {
+  id                   String    @id
+  guildId              String
+  channelId            String    @unique
+  creatorId            String
+  creatorName          String
+  subject              String?
+  status               String    @default("open")
+  closedBy             String?
+  closedAt             DateTime?
+  reopenedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime
+  activeCloseMessageId String?
+  Guild                Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, status])
+}
+
+model TicketConfig {
+  id                  String   @id
+  guildId             String   @unique
+  enabled             Boolean  @default(false)
+  categoryId          String?
+  ticketNameFormat    String   @default("ticket-{user.globalname}")
+  maxOpenPerUser      Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+  accessRoleIds       String[] @default([])
+  askCloseReason      Boolean  @default(true)
+  askOpenReason       Boolean  @default(true)
+  autoDeleteOnClose   Boolean  @default(true)
+  confirmationMessage String   @default("Votre ticket a bien été envoyé, un membre du staff vous prendra rapidement en charge si votre ticket est accepté !")
+  logChannelId        String?
+  mentionModerators   Boolean  @default(true)
+  moderatorRoleIds    String[] @default([])
+  noReasonMessage     String   @default("N'hésitez pas à décrire votre problème, un membre du staff vous prendra rapidement en charge.")
+  validationEnabled   Boolean  @default(true)
+  Guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model TicketRequest {
+  id                  String   @id
+  guildId             String
+  requesterId         String
+  requesterName       String
+  reason              String?
+  status              String   @default("pending")
+  createdAt           DateTime @default(now())
+  validationChannelId String?
+  validationMessageId String?
+  Guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, status])
+}
+
+model UserXp {
+  id            String    @id
+  guildId       String
+  discordUserId String
+  username      String
+  avatar        String?
+  xp            Int       @default(0)
+  level         Int       @default(0)
+  messageCount  Int       @default(0)
+  lastXpAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  Guild         Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, discordUserId])
+  @@index([guildId, xp])
+}
+
+model XpSettings {
+  id                     String   @id
+  guildId                String   @unique
+  enabled                Boolean  @default(false)
+  xpMin                  Int      @default(15)
+  xpMax                  Int      @default(25)
+  cooldownSeconds        Int      @default(30)
+  levelUpChannelId       String?
+  levelUpMessage         String   @default("{user}, vous venez de passer au niveau {level} !")
+  ignoredChannelIds      String[] @default([])
+  ignoredRoleIds         String[] @default([])
+  stackRoles             Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime
+  boosterChannelIds      String[] @default([])
+  boosterRoleIds         String[] @default([])
+  curveMultiplier        Float    @default(1)
+  curveStyle             String   @default("exponential")
+  levelUpAnnounceMode    String   @default("channel")
+  levelUpMinLevel        Int      @default(0)
+  longMessageDoubleXp    Boolean  @default(false)
+  maxLevel               Int      @default(0)
+  resetXpOnBan           Boolean  @default(false)
+  resetXpOnLeave         Boolean  @default(true)
+  rewardAnnounceMode     String   @default("channel")
+  rewardChannelId        String?
+  rewardMessage          String   @default("{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !")
+  viewOthersLevel        Boolean  @default(true)
+  xpChannelMode          String   @default("without")
+  xpInForumPosts         Boolean  @default(true)
+  xpInThreads            Boolean  @default(true)
+  xpRoleMode             String   @default("without")
+  voiceTextXpMode        String   @default("everyone")
+  voiceXpEnabled         Boolean  @default(false)
+  voiceXpIntervalSeconds Int      @default(60)
+  voiceXpMax             Int      @default(15)
+  voiceXpMin             Int      @default(5)
+  Guild                  Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
