@@ -7,9 +7,10 @@ export default async function LevelsPage({ params }: { params: { guildId: string
   const session = getSession();
   if (!session) return null; // le layout parent redirige déjà si non connecté
 
-  const [guild, config, bot] = await Promise.all([
+  const [guild, config, rewards, bot] = await Promise.all([
     prisma.guild.findUnique({ where: { id: params.guildId } }),
     prisma.xpSettings.findUnique({ where: { guildId: params.guildId } }),
+    prisma.levelRole.findMany({ where: { guildId: params.guildId }, orderBy: { level: 'desc' } }),
     getBotIdentity(),
   ]);
 
@@ -27,6 +28,14 @@ export default async function LevelsPage({ params }: { params: { guildId: string
       previewUsername={displayName(session)}
       botName={bot.name}
       botAvatarUrl={bot.avatarUrl}
+      initialRewards={rewards.map((r) => ({
+        id: r.id,
+        level: r.level,
+        roleId: r.roleId,
+        rewardType: r.rewardType,
+        stackMode: r.stackMode,
+        durationSeconds: r.durationSeconds,
+      }))}
       initial={
         config
           ? {
@@ -51,6 +60,16 @@ export default async function LevelsPage({ params }: { params: { guildId: string
               xpChannelMode: config.xpChannelMode,
               ignoredChannelIds: config.ignoredChannelIds,
               boosterChannelIds: config.boosterChannelIds,
+              xpInThreads: config.xpInThreads,
+              xpInForumPosts: config.xpInForumPosts,
+              voiceTextXpMode: config.voiceTextXpMode,
+              viewOthersLevel: config.viewOthersLevel,
+              resetXpOnLeave: config.resetXpOnLeave,
+              resetXpOnBan: config.resetXpOnBan,
+              longMessageDoubleXp: config.longMessageDoubleXp,
+              rewardAnnounceMode: config.rewardAnnounceMode,
+              rewardChannelId: config.rewardChannelId,
+              rewardMessage: config.rewardMessage,
             }
           : undefined
       }

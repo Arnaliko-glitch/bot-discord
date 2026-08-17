@@ -38,6 +38,25 @@ interface LevelsConfigData {
   xpChannelMode: string;
   ignoredChannelIds: string[];
   boosterChannelIds: string[];
+  xpInThreads: boolean;
+  xpInForumPosts: boolean;
+  voiceTextXpMode: string;
+  viewOthersLevel: boolean;
+  resetXpOnLeave: boolean;
+  resetXpOnBan: boolean;
+  longMessageDoubleXp: boolean;
+  rewardAnnounceMode: string;
+  rewardChannelId: string | null;
+  rewardMessage: string;
+}
+
+interface LevelRoleReward {
+  id: string;
+  level: number;
+  roleId: string;
+  rewardType: string;
+  stackMode: string;
+  durationSeconds: number | null;
 }
 
 const DEFAULT_CONFIG: LevelsConfigData = {
@@ -62,6 +81,16 @@ const DEFAULT_CONFIG: LevelsConfigData = {
   xpChannelMode: 'without',
   ignoredChannelIds: [],
   boosterChannelIds: [],
+  xpInThreads: true,
+  xpInForumPosts: true,
+  voiceTextXpMode: 'everyone',
+  viewOthersLevel: true,
+  resetXpOnLeave: true,
+  resetXpOnBan: false,
+  longMessageDoubleXp: false,
+  rewardAnnounceMode: 'channel',
+  rewardChannelId: null,
+  rewardMessage: '{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !',
 };
 
 const CURVE_LABELS: Record<string, string> = {
@@ -222,6 +251,286 @@ function MessagePreview({
   );
 }
 
+// Couleur fixe de l'embed de récompense — comme pour le level-up, ce visuel
+// n'est pas personnalisable.
+const REWARD_EMBED_COLOR = '#ED4245';
+
+// Même principe que MessagePreview (level-up), mais pour l'annonce de
+// récompense — le rôle affiché est purement illustratif ici.
+function RewardMessagePreview({
+  botName,
+  botAvatarUrl,
+  now,
+  avatarUrl,
+  rewardMessage,
+  previewUsername,
+  level,
+  roleName,
+  roles,
+  channels,
+}: {
+  botName: string;
+  botAvatarUrl: string | null;
+  now: string;
+  avatarUrl: string;
+  rewardMessage: string;
+  previewUsername: string;
+  level: number;
+  roleName: string;
+  roles: RoleOption[];
+  channels: Channel[];
+}) {
+  const contentParts = rewardMessage.replaceAll('{reward.level}', String(level)).split('{user}');
+
+  return (
+    <div className="card space-y-2 p-4">
+      <div className="flex items-center gap-2">
+        {botAvatarUrl ? (
+          <img src={botAvatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full" />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">
+            {botName.slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-white">{botName}</span>
+          <span className="rounded bg-[var(--accent)] px-1 py-0.5 text-[9px] font-medium text-white">APP</span>
+          <span className="text-xs text-gray-500">{now}</span>
+        </div>
+      </div>
+
+      <p className="whitespace-pre-wrap text-sm text-[#dcddde]">
+        {contentParts.map((part, i) => (
+          <span key={i}>
+            {renderMentionText(part, roles, channels)}
+            {i < contentParts.length - 1 && <span className="text-[#00a8fc]">@{previewUsername}</span>}
+          </span>
+        ))}
+      </p>
+
+      <div className="flex overflow-hidden rounded">
+        <div className="w-1 shrink-0" style={{ backgroundColor: REWARD_EMBED_COLOR }} />
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#2b2d31] p-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-14 w-14 shrink-0 rounded-full"
+              style={{ boxShadow: `0 0 0 2px ${REWARD_EMBED_COLOR}` }}
+            />
+            <div className="min-w-0">
+              <p className="text-lg font-bold text-white">Félicitations !</p>
+              <p className="text-sm text-[#dcddde]">vous recevez le rôle</p>
+              <p className="truncate text-sm font-bold" style={{ color: REWARD_EMBED_COLOR }}>
+                {roleName}
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-2xl">🎉</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const DURATION_OPTIONS = [
+  { value: 3600, label: '1 heure' },
+  { value: 86400, label: '1 jour' },
+  { value: 604800, label: '1 semaine' },
+  { value: 2592000, label: '1 mois' },
+];
+
+// Popup de création/édition d'une récompense — le formulaire change selon
+// le type choisi (rôle permanent avec gestion cumulable/évolutif, ou rôle
+// temporaire avec une durée).
+function RewardModal({
+  roles,
+  existing,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  roles: RoleOption[];
+  existing: LevelRoleReward | null;
+  error: string;
+  onClose: () => void;
+  onSubmit: (data: {
+    level: number;
+    roleId: string;
+    rewardType: string;
+    stackMode: string;
+    durationSeconds: number | null;
+  }) => void;
+}) {
+  const [rewardType, setRewardType] = useState(existing?.rewardType ?? '');
+  const [level, setLevel] = useState(existing?.level ?? 0);
+  const [roleId, setRoleId] = useState(existing?.roleId ?? '');
+  const [stackMode, setStackMode] = useState(existing?.stackMode ?? 'stack');
+  const [durationSeconds, setDurationSeconds] = useState(existing?.durationSeconds ?? 0);
+
+  const canSubmit =
+    !!rewardType && level > 0 && !!roleId && (rewardType !== 'temporary_role' || durationSeconds > 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-xl border border-white/10 bg-[#1a1d23] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-white">
+          {existing ? 'Modification' : 'Création'} d&apos;une récompense
+        </h3>
+
+        {error && <p className="mb-3 text-xs text-[#ED4245]">{error}</p>}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Type de récompense
+            </span>
+            <select value={rewardType} onChange={(e) => setRewardType(e.target.value)} className="input">
+              <option value="">Veuillez sélectionner un type de récompense.</option>
+              <option value="role">Un rôle</option>
+              <option value="temporary_role">Un rôle temporaire</option>
+            </select>
+          </div>
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Niveau requis
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={level || ''}
+              onChange={(e) => setLevel(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+              placeholder="Niveau"
+              className="input"
+            />
+          </div>
+        </div>
+
+        {rewardType === 'role' && (
+          <>
+            <div className="mt-4">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Rôle</span>
+              <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className="input">
+                <option value="">Veuillez sélectionner un rôle</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id} style={r.color ? { color: r.color } : undefined}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-4">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Gestion du rôle
+              </span>
+              <div className="space-y-2">
+                <label
+                  className={`block cursor-pointer rounded-lg border p-3 transition ${
+                    stackMode === 'stack' ? 'border-[var(--accent)]' : 'border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={stackMode === 'stack'}
+                      onChange={() => setStackMode('stack')}
+                      className="accent-[var(--accent)]"
+                    />
+                    <span className="text-sm font-medium text-white">Rôle Cumulable</span>
+                  </div>
+                  <p className="ml-6 text-xs text-gray-500">
+                    Les rôles cumulables sont conservés lorsque l&apos;utilisateur reçoit un nouveau rôle.
+                  </p>
+                </label>
+                <label
+                  className={`block cursor-pointer rounded-lg border p-3 transition ${
+                    stackMode === 'evolve' ? 'border-[var(--accent)]' : 'border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={stackMode === 'evolve'}
+                      onChange={() => setStackMode('evolve')}
+                      className="accent-[var(--accent)]"
+                    />
+                    <span className="text-sm font-medium text-white">Rôle Évolutif</span>
+                  </div>
+                  <p className="ml-6 text-xs text-gray-500">
+                    Les rôles évolutifs se succèdent, remplaçant le précédent à chaque nouveau rôle.
+                  </p>
+                </label>
+              </div>
+            </div>
+          </>
+        )}
+
+        {rewardType === 'temporary_role' && (
+          <>
+            <div className="mt-4">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Rôle temporaire
+              </span>
+              <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className="input">
+                <option value="">Veuillez sélectionner un rôle</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id} style={r.color ? { color: r.color } : undefined}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-4">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Durée du rôle
+              </span>
+              <select
+                value={durationSeconds || ''}
+                onChange={(e) => setDurationSeconds(Number(e.target.value) || 0)}
+                className="input"
+              >
+                <option value="">Aucune durée sélectionnée</option>
+                {DURATION_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-4">
+          <button type="button" onClick={onClose} className="text-sm text-gray-400 hover:text-gray-200">
+            Annuler
+          </button>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() =>
+              onSubmit({
+                level,
+                roleId,
+                rewardType,
+                stackMode,
+                durationSeconds: rewardType === 'temporary_role' ? durationSeconds : null,
+              })
+            }
+            className="btn-primary text-sm disabled:opacity-50"
+          >
+            {existing ? 'Modifier' : 'Créer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LevelsConfigPage({
   guildId,
   previewAvatarUrl,
@@ -231,6 +540,7 @@ export function LevelsConfigPage({
   botName,
   botAvatarUrl,
   initial,
+  initialRewards,
 }: {
   guildId: string;
   guildName: string;
@@ -240,6 +550,7 @@ export function LevelsConfigPage({
   botName: string;
   botAvatarUrl: string | null;
   initial?: LevelsConfigData;
+  initialRewards: LevelRoleReward[];
 }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
@@ -250,6 +561,9 @@ export function LevelsConfigPage({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [editingModal, setEditingModal] = useState<'xp' | 'voice' | 'curve' | null>(null);
+  const [rewards, setRewards] = useState<LevelRoleReward[]>(initialRewards);
+  const [rewardModal, setRewardModal] = useState<'new' | LevelRoleReward | null>(null);
+  const [rewardError, setRewardError] = useState('');
   const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const router = useRouter();
 
@@ -350,13 +664,56 @@ export function LevelsConfigPage({
     setSaving(false);
   }
 
+  // Les récompenses sont un CRUD indépendant (chaque carte a son propre
+  // Modifier/Supprimer instantané) — pas liées au bouton "Enregistrer"
+  // global du reste du formulaire.
+  async function submitReward(data: {
+    level: number;
+    roleId: string;
+    rewardType: string;
+    stackMode: string;
+    durationSeconds: number | null;
+  }) {
+    setRewardError('');
+    const editing = rewardModal !== 'new' ? rewardModal : null;
+    const res = await fetch(
+      editing ? `/api/guilds/${guildId}/level-roles/${editing.id}` : `/api/guilds/${guildId}/level-roles`,
+      {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }
+    );
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setRewardError(result.error ?? 'Erreur lors de l’enregistrement');
+      return;
+    }
+    setRewards((list) => {
+      const withoutEditing = editing ? list.filter((r) => r.id !== editing.id) : list;
+      return [...withoutEditing, result as LevelRoleReward].sort((a, b) => b.level - a.level);
+    });
+    setRewardModal(null);
+  }
+
+  async function deleteReward(reward: LevelRoleReward) {
+    if (!window.confirm(`Supprimer la récompense de niveau ${reward.level} ?`)) return;
+    const res = await fetch(`/api/guilds/${guildId}/level-roles/${reward.id}`, { method: 'DELETE' });
+    if (res.ok) setRewards((list) => list.filter((r) => r.id !== reward.id));
+  }
+
   const announceEnabled = config.levelUpAnnounceMode !== 'disabled';
+  // "current" (le salon concerné) déduit le salon dynamiquement — pas de
+  // sélecteur de salon à afficher dans ce mode, contrairement à "channel".
+  const showAnnounceChannelField = config.levelUpAnnounceMode === 'channel';
   const xpSummary = `Entre ${config.xpMin} et ${config.xpMax} xp par message toutes les ${config.cooldownSeconds} secondes`;
   const voiceSummary = config.voiceXpEnabled
     ? `Entre ${config.voiceXpMin} et ${config.voiceXpMax} xp toutes les ${config.voiceXpIntervalSeconds} secondes`
     : 'Désactivé';
   const curveSummary = `Courbe ${CURVE_LABELS[config.curveStyle] ?? config.curveStyle} avec multiplicateur x${config.curveMultiplier}`;
   const previewLevel = 5;
+  const rewardAnnounceEnabled = config.rewardAnnounceMode !== 'disabled';
+  const showRewardChannelField = config.rewardAnnounceMode === 'channel';
 
   return (
     <div className="space-y-8 pb-24">
@@ -381,6 +738,7 @@ export function LevelsConfigPage({
                 onChange={(e) => update('levelUpAnnounceMode', e.target.value)}
                 className="input appearance-none pr-9"
               >
+                <option value="current">Dans le salon concerné</option>
                 <option value="disabled">Désactivé</option>
                 <option value="channel">Dans un salon personnalisé</option>
               </select>
@@ -409,16 +767,18 @@ export function LevelsConfigPage({
         {announceEnabled && (
           <div className="grid gap-8 lg:grid-cols-2">
             <div className="space-y-4">
-              <div>
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Salon</span>
-                <ChannelSelect
-                  label=""
-                  channels={channels}
-                  value={config.levelUpChannelId ?? ''}
-                  onChange={(v) => update('levelUpChannelId', v || null)}
-                  loading={channelsLoading}
-                />
-              </div>
+              {showAnnounceChannelField && (
+                <div>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Salon</span>
+                  <ChannelSelect
+                    label=""
+                    channels={channels}
+                    value={config.levelUpChannelId ?? ''}
+                    onChange={(v) => update('levelUpChannelId', v || null)}
+                    loading={channelsLoading}
+                  />
+                </div>
+              )}
 
               <div>
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -572,6 +932,255 @@ export function LevelsConfigPage({
           </div>
         </div>
       </section>
+
+      <section className="space-y-4 border-t border-[var(--border)] pt-8">
+        <div>
+          <h2 className="font-semibold text-white">Options supplémentaires</h2>
+          <p className="text-sm text-gray-500">Ajustez le fonctionnement du module de niveaux.</p>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Gain d&apos;expérience dans les fils de discussions
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.xpInThreads} onChange={(v) => update('xpInThreads', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous activer le gain d&apos;expérience dans les fils de discussions (threads) ?
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Gain d&apos;XP par message dans un salon vocal
+              </span>
+              <div className="relative">
+                <select
+                  value={config.voiceTextXpMode}
+                  onChange={(e) => update('voiceTextXpMode', e.target.value)}
+                  className="input appearance-none pr-9"
+                >
+                  <option value="everyone">Tout le monde</option>
+                  <option value="connected">Seulement si connecté(e) au salon</option>
+                  <option value="disabled">Désactivé</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Réinitialisation de l&apos;expérience lors du départ
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.resetXpOnLeave} onChange={(v) => update('resetXpOnLeave', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous que les membres perdent leur expérience lorsqu&apos;ils quittent le serveur ?
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Longs messages comptent double
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.longMessageDoubleXp} onChange={(v) => update('longMessageDoubleXp', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous que les messages faisant plus de 250 caractères comptent le double d&apos;expérience ?
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Gain d&apos;expérience dans les posts de forums
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.xpInForumPosts} onChange={(v) => update('xpInForumPosts', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous activer le gain d&apos;expérience dans les posts de forums ?
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Voir le niveau des autres membres
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.viewOthersLevel} onChange={(v) => update('viewOthersLevel', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous que les membres puissent regarder le niveau des autres membres du serveur ?
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Réinitialisation de l&apos;expérience lors du bannissement
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={config.resetXpOnBan} onChange={(v) => update('resetXpOnBan', v)} />
+                <span className="text-sm text-gray-400">
+                  Voulez-vous que les membres perdent leur expérience lorsqu&apos;ils sont bannis du serveur ?
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t border-[var(--border)] pt-8">
+        <div>
+          <h2 className="font-semibold text-white">Récompenses de niveaux</h2>
+          <p className="text-sm text-gray-500">Configurez le système de récompenses pour votre serveur.</p>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Annonce d&apos;une récompense gagnée
+              </span>
+              <div className="relative">
+                <select
+                  value={config.rewardAnnounceMode}
+                  onChange={(e) => update('rewardAnnounceMode', e.target.value)}
+                  className="input appearance-none pr-9"
+                >
+                  <option value="current">Dans le salon concerné</option>
+                  <option value="disabled">Désactivé</option>
+                  <option value="channel">Dans un salon personnalisé</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+
+            {rewardAnnounceEnabled && showRewardChannelField && (
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Salon</span>
+                <ChannelSelect
+                  label=""
+                  channels={channels}
+                  value={config.rewardChannelId ?? ''}
+                  onChange={(v) => update('rewardChannelId', v || null)}
+                  loading={channelsLoading}
+                />
+              </div>
+            )}
+
+            {rewardAnnounceEnabled && (
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Message personnalisé
+                </span>
+                <div className="relative">
+                  <MentionTextarea
+                    value={config.rewardMessage}
+                    onChange={(v) => update('rewardMessage', v)}
+                    roles={roles}
+                    channels={channels}
+                    rows={4}
+                    maxLength={1000}
+                    className="input resize-none pr-9"
+                  />
+                  <div className="absolute right-2 top-2">
+                    <EmojiPickerButton
+                      guildName={guildName}
+                      guildIconUrl={guildIconUrl}
+                      guildEmojis={guildEmojis}
+                      onPick={(e) => update('rewardMessage', (config.rewardMessage + e).slice(0, 1000))}
+                    />
+                  </div>
+                </div>
+                <p className="mt-1 text-right text-xs text-gray-500">{config.rewardMessage.length} /1000</p>
+              </div>
+            )}
+
+            {rewardAnnounceEnabled && (
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Prévisualisation
+                </span>
+                <RewardMessagePreview
+                  botName={botName}
+                  botAvatarUrl={botAvatarUrl}
+                  now={now}
+                  avatarUrl={previewAvatarUrl}
+                  rewardMessage={config.rewardMessage}
+                  previewUsername={previewUsername}
+                  level={previewLevel}
+                  roleName={roles[0]?.name ?? 'Nom du rôle'}
+                  roles={roles}
+                  channels={channels}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Récompenses
+            </span>
+            <button type="button" onClick={() => setRewardModal('new')} className="btn-primary w-full">
+              Créer une récompense
+            </button>
+
+            <div className="space-y-3">
+              {rewards.map((reward) => {
+                const role = roles.find((r) => r.id === reward.roleId);
+                return (
+                  <div key={reward.id} className="card space-y-2 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm text-white">
+                        Rôle <span style={role?.color ? { color: role.color } : undefined}>@{role?.name ?? 'Rôle inconnu'}</span>
+                      </p>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRewardModal(reward)}
+                          className="btn-secondary text-xs"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteReward(reward)}
+                          className="rounded-lg border border-[#ED4245]/40 px-3 py-1.5 text-xs font-medium text-[#ED4245] transition hover:bg-[#ED4245]/10"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Accessible au niveau <span className="text-gray-300">{reward.level}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {rewardModal && (
+        <RewardModal
+          roles={roles}
+          existing={rewardModal === 'new' ? null : rewardModal}
+          error={rewardError}
+          onClose={() => {
+            setRewardModal(null);
+            setRewardError('');
+          }}
+          onSubmit={submitReward}
+        />
+      )}
 
       {editingModal === 'xp' && (
         <EditModal title="Expérience par message" onClose={() => setEditingModal(null)}>

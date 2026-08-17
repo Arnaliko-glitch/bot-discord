@@ -36,7 +36,7 @@ model Guild {
 model WelcomeConfig {
   id                       String   @id @default(cuid())
   guildId                  String   @unique
-  enabled                  Boolean  @default(true)
+  enabled                  Boolean  @default(false)
   channelId                String?
   goodbyeChannelId         String?
   message                  String   @default("Bienvenue {user} sur **{server}** ! Tu es le membre n°{server.membercount}.")
@@ -93,12 +93,20 @@ model GuildSettings {
 }
 
 model LevelRole {
-  id        String   @id
-  guildId   String
-  level     Int
-  roleId    String
-  createdAt DateTime @default(now())
-  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  id              String   @id
+  guildId         String
+  level           Int
+  roleId          String
+  // "role" (permanent) | "temporary_role"
+  rewardType      String   @default("role")
+  // "stack" (cumulable) | "evolve" (remplace la précédente) — pertinent
+  // seulement pour rewardType="role".
+  stackMode       String   @default("stack")
+  // Durée en secondes avant retrait automatique — seulement pour
+  // rewardType="temporary_role" (1h/1j/1semaine/1mois proposés dans l'UI).
+  durationSeconds Int?
+  createdAt       DateTime @default(now())
+  Guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, level])
 }

@@ -7,7 +7,7 @@ type Params = { params: { id: string } };
 // Mêmes valeurs par défaut que la colonne en base (schema.prisma) — utilisées
 // seulement si la guilde n'a pas encore de ligne WelcomeConfig du tout.
 const DEFAULTS = {
-  enabled: true,
+  enabled: false,
   channelId: null as string | null,
   message: 'Bienvenue {user} sur **{server}** ! Tu es le membre n°{server.membercount}.',
   mentionUser: true,

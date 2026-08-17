@@ -42,7 +42,7 @@ interface WelcomeConfigData {
 }
 
 const DEFAULT_CONFIG: WelcomeConfigData = {
-  enabled: true,
+  enabled: false,
   channelId: null,
   message: 'Bienvenue {user} sur **{server}** ! Tu es le membre n°{server.membercount}.',
   mentionUser: true,

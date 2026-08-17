@@ -29,7 +29,20 @@ const DEFAULTS = {
   xpChannelMode: 'without' as string,
   ignoredChannelIds: [] as string[],
   boosterChannelIds: [] as string[],
+  xpInThreads: true,
+  xpInForumPosts: true,
+  voiceTextXpMode: 'everyone' as string,
+  viewOthersLevel: true,
+  resetXpOnLeave: true,
+  resetXpOnBan: false,
+  longMessageDoubleXp: false,
+  rewardAnnounceMode: 'channel' as string,
+  rewardChannelId: null as string | null,
+  rewardMessage: '{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !',
 };
+
+const ANNOUNCE_MODES = new Set(['current', 'disabled', 'channel']);
+const VOICE_TEXT_XP_MODES = new Set(['everyone', 'connected', 'disabled']);
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -58,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const data = {
     enabled: !!body.enabled,
-    levelUpAnnounceMode: body.levelUpAnnounceMode === 'disabled' ? 'disabled' : 'channel',
+    levelUpAnnounceMode: ANNOUNCE_MODES.has(body.levelUpAnnounceMode) ? body.levelUpAnnounceMode : 'channel',
     levelUpChannelId: body.levelUpChannelId || null,
     levelUpMessage: String(body.levelUpMessage ?? '').slice(0, 1000),
     levelUpMinLevel: Math.max(0, Math.trunc(Number(body.levelUpMinLevel) || 0)),
@@ -78,6 +91,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
     xpChannelMode: body.xpChannelMode === 'with' ? 'with' : 'without',
     ignoredChannelIds: toStringArray(body.ignoredChannelIds),
     boosterChannelIds: toStringArray(body.boosterChannelIds),
+    xpInThreads: !!body.xpInThreads,
+    xpInForumPosts: !!body.xpInForumPosts,
+    voiceTextXpMode: VOICE_TEXT_XP_MODES.has(body.voiceTextXpMode) ? body.voiceTextXpMode : 'everyone',
+    viewOthersLevel: !!body.viewOthersLevel,
+    resetXpOnLeave: !!body.resetXpOnLeave,
+    resetXpOnBan: !!body.resetXpOnBan,
+    longMessageDoubleXp: !!body.longMessageDoubleXp,
+    rewardAnnounceMode: ANNOUNCE_MODES.has(body.rewardAnnounceMode) ? body.rewardAnnounceMode : 'channel',
+    rewardChannelId: body.rewardChannelId || null,
+    rewardMessage: String(body.rewardMessage ?? '').slice(0, 1000),
   };
 
   const updated = await prisma.xpSettings.upsert({
