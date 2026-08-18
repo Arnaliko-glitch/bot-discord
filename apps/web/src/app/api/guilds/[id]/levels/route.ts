@@ -69,6 +69,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 });
 
+  if (body.levelUpAnnounceMode === 'channel' && !body.levelUpChannelId) {
+    return NextResponse.json({ error: 'Un salon est requis pour l’annonce de niveau' }, { status: 400 });
+  }
+  if (body.rewardAnnounceMode === 'channel' && !body.rewardChannelId) {
+    return NextResponse.json({ error: 'Un salon est requis pour l’annonce de récompense' }, { status: 400 });
+  }
+
   const data = {
     enabled: !!body.enabled,
     levelUpAnnounceMode: ANNOUNCE_MODES.has(body.levelUpAnnounceMode) ? body.levelUpAnnounceMode : 'channel',

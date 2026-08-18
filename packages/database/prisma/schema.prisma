@@ -23,6 +23,7 @@ model Guild {
   DashboardPermission DashboardPermission[]
   GuildSettings       GuildSettings?
   LevelRole           LevelRole[]
+  TemporaryRoleGrant  TemporaryRoleGrant[]
   LogEntry            LogEntry[]
   SavedMessage        SavedMessage[]
   Ticket              Ticket[]
@@ -111,6 +112,21 @@ model LevelRole {
   @@unique([guildId, level])
 }
 
+// Un rôle temporaire (LevelRole.rewardType = "temporary_role") accordé à un
+// membre — Discord n'a pas de retrait automatique natif, on suit donc
+// nous-mêmes l'échéance pour la retirer via un balayage périodique du bot.
+model TemporaryRoleGrant {
+  id        String   @id
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
 model LogEntry {
   id         String   @id
   guildId    String
@@ -157,6 +173,7 @@ model Ticket {
   status               String    @default("open")
   closedBy             String?
   closedAt             DateTime?
+  closeReason          String?
   reopenedAt           DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime
@@ -171,7 +188,7 @@ model TicketConfig {
   guildId             String   @unique
   enabled             Boolean  @default(false)
   categoryId          String?
-  ticketNameFormat    String   @default("ticket-{user.globalname}")
+  ticketNameFormat    String   @default("{user.globalname}")
   maxOpenPerUser      Int      @default(1)
   createdAt           DateTime @default(now())
   updatedAt           DateTime
@@ -185,6 +202,11 @@ model TicketConfig {
   moderatorRoleIds    String[] @default([])
   noReasonMessage     String   @default("N'hésitez pas à décrire votre problème, un membre du staff vous prendra rapidement en charge.")
   validationEnabled   Boolean  @default(true)
+  openPrivateThread   Boolean  @default(false)
+  autoSaveTranscript  Boolean  @default(false)
+  // Message posté par le bot à l'ouverture du salon de ticket — version
+  // texte simple en attendant le composeur de messages (avec boutons/embed).
+  openingMessage      String   @default("Bonjour {user}, décrivez votre problème et un membre du staff vous répondra sous peu.")
   Guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
@@ -198,6 +220,8 @@ model TicketRequest {
   createdAt           DateTime @default(now())
   validationChannelId String?
   validationMessageId String?
+  denyReason          String?
+  decidedBy           String?
   Guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId, status])

@@ -647,6 +647,14 @@ export function LevelsConfigPage({
   }
 
   async function save() {
+    if (config.levelUpAnnounceMode === 'channel' && !config.levelUpChannelId) {
+      setMessage('❌ Choisissez un salon pour l’annonce de niveau.');
+      return;
+    }
+    if (config.rewardAnnounceMode === 'channel' && !config.rewardChannelId) {
+      setMessage('❌ Choisissez un salon pour l’annonce de récompense.');
+      return;
+    }
     setSaving(true);
     setMessage('');
     const res = await fetch(`/api/guilds/${guildId}/levels`, {
@@ -777,6 +785,9 @@ export function LevelsConfigPage({
                     onChange={(v) => update('levelUpChannelId', v || null)}
                     loading={channelsLoading}
                   />
+                  {!config.levelUpChannelId && (
+                    <p className="mt-1 text-xs text-[#ED4245]">Vous devez choisir un salon.</p>
+                  )}
                 </div>
               )}
 
@@ -1072,6 +1083,7 @@ export function LevelsConfigPage({
                   onChange={(v) => update('rewardChannelId', v || null)}
                   loading={channelsLoading}
                 />
+                {!config.rewardChannelId && <p className="mt-1 text-xs text-[#ED4245]">Vous devez choisir un salon.</p>}
               </div>
             )}
 

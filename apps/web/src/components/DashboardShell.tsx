@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { DoorOpen, Home, MessageSquare, ScrollText, Settings, Ticket, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, DoorOpen, Home, MessageSquare, ScrollText, Ticket, TrendingUp } from 'lucide-react';
 import { UnsavedChangesProvider, useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
 // Réduit aux modules déjà (ou bientôt) reconstruits — les autres reviendront
@@ -89,7 +89,7 @@ function DashboardShellContent({
             title="Changer de serveur"
             className="text-gray-500 hover:text-white"
           >
-            <Settings className="h-4 w-4" />
+            <ArrowLeftRight className="h-4 w-4" />
           </Link>
         </div>
 

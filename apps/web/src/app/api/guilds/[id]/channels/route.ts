@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireGuildAccess } from '@/lib/guild-access';
 
 type Params = { params: { id: string } };
@@ -12,8 +12,10 @@ interface DiscordChannel {
 // GUILD_TEXT et GUILD_ANNOUNCEMENT — les seuls types de salon où le bot peut
 // poster un message texte.
 const TEXT_CHANNEL_TYPES = new Set([0, 5]);
+// GUILD_CATEGORY
+const CATEGORY_CHANNEL_TYPES = new Set([4]);
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
     await requireGuildAccess(params.id);
   } catch {
@@ -26,11 +28,14 @@ export async function GET(_request: Request, { params }: Params) {
   });
   if (!res.ok) return NextResponse.json({ error: 'Impossible de récupérer les salons' }, { status: 502 });
 
+  const type = request.nextUrl.searchParams.get('type');
+  const allowedTypes = type === 'category' ? CATEGORY_CHANNEL_TYPES : TEXT_CHANNEL_TYPES;
+
   const channels = (await res.json()) as DiscordChannel[];
-  const textChannels = channels
-    .filter((c) => TEXT_CHANNEL_TYPES.has(c.type))
+  const filtered = channels
+    .filter((c) => allowedTypes.has(c.type))
     .map((c) => ({ id: c.id, name: c.name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  return NextResponse.json(textChannels);
+  return NextResponse.json(filtered);
 }
