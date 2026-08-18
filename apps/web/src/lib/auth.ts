@@ -72,7 +72,11 @@ interface GuildsCacheEntry {
 }
 
 const guildsCache = new Map<string, GuildsCacheEntry>();
-const GUILDS_CACHE_TTL_MS = 10_000;
+// Le layout du dashboard rappelle fetchUserGuilds() à chaque navigation
+// (chaque clic dans le menu) — un TTL plus long réduit d'autant les appels
+// à cet endpoint particulièrement rate-limité, sans gêner l'utilisateur
+// (la liste de guildes/permissions ne change quasiment jamais en session).
+const GUILDS_CACHE_TTL_MS = 60_000;
 
 async function fetchUserGuildsRaw(accessToken: string): Promise<SessionGuild[]> {
   const res = await fetch('https://discord.com/api/users/@me/guilds', {

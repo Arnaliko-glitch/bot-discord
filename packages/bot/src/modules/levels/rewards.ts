@@ -76,7 +76,7 @@ export async function applyLevelRewards(
       avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 128 }),
       accentColor,
       line1: 'vous recevez le rôle',
-      line2: `@${role.name}`,
+      line2: role.name,
       emoji: '🎉',
     });
     const attachment = new AttachmentBuilder(card, { name: 'reward.png' });

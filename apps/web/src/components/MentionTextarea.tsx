@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AtSign, Hash } from 'lucide-react';
 import { parse as parseTwemoji } from 'twemoji-parser';
 import { TwemojiSpriteImg } from '@/components/TwemojiSpriteImg';
@@ -61,6 +61,15 @@ export function MentionTextarea({
   const ref = useRef<HTMLTextAreaElement>(null);
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Auto-agrandit la zone de texte à chaque retour à la ligne, comme une
+  // vraie zone de saisie Discord, au lieu de rester figée à `rows`.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
 
   const options: Array<RoleOption | ChannelOption> = trigger
     ? (trigger.type === '@' ? roles : channels)
@@ -131,6 +140,7 @@ export function MentionTextarea({
         rows={rows}
         placeholder={placeholder}
         className={className}
+        style={{ overflow: 'hidden' }}
       />
       {trigger && options.length > 0 && (
         <div className="absolute left-0 top-full z-20 mt-1 w-64 overflow-hidden rounded-lg border border-white/10 bg-[#1a1d23] py-1 shadow-xl">

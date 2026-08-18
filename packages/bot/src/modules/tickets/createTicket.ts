@@ -46,7 +46,7 @@ export async function createTicketChannel(
     ...config.accessRoleIds.map((roleId) => ({ id: roleId, allow: CHANNEL_ACCESS })),
   ];
 
-  const requesterMember = await guild.members.fetch(requester.id).catch(() => null);
+  const requesterMember = guild.members.cache.get(requester.id) ?? (await guild.members.fetch(requester.id).catch(() => null));
   const requesterDisplayName = requesterMember?.displayName ?? requester.username;
 
   const channel = await guild.channels.create({

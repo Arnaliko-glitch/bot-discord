@@ -14,12 +14,14 @@ export function ChannelSelect({
   value,
   onChange,
   loading,
+  disabled,
 }: {
   label: string;
   channels: Channel[];
   value: string;
   onChange: (v: string) => void;
   loading?: boolean;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,8 +42,8 @@ export function ChannelSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        disabled={loading}
-        className="input flex items-center justify-between gap-2 text-left disabled:opacity-50"
+        disabled={loading || disabled}
+        className="input flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="flex min-w-0 items-center gap-1.5 truncate">
           {selected ? (

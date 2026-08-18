@@ -1,9 +1,9 @@
 import { ActivityType, type Client } from 'discord.js';
 
 const PHRASES = [
-  '🤖 Gère Le Serveur',
+  '🤖 Gère Onory',
   '📡 Système Actif',
-  '🛡️ Sécurise Le Serveur',
+  '🛡️ Sécurise Onory',
   '👋 Accueille Les Membres',
   '💫 Toujours Là',
   '🎫 Gère Les Tickets',

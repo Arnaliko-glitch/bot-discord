@@ -88,15 +88,17 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   // Garde la table Guild à jour avec les serveurs où le bot est présent —
   // le dashboard s'en sert pour savoir quelles guildes proposer à l'utilisateur.
-  for (const guild of readyClient.guilds.cache.values()) {
-    await prisma.guild
-      .upsert({
-        where: { id: guild.id },
-        update: { name: guild.name, icon: guild.icon },
-        create: { id: guild.id, name: guild.name, icon: guild.icon, ownerId: guild.ownerId },
-      })
-      .catch((err) => console.error(`Échec de la synchro de la guilde ${guild.id}:`, err));
-  }
+  await Promise.all(
+    readyClient.guilds.cache.map((guild) =>
+      prisma.guild
+        .upsert({
+          where: { id: guild.id },
+          update: { name: guild.name, icon: guild.icon },
+          create: { id: guild.id, name: guild.name, icon: guild.icon, ownerId: guild.ownerId },
+        })
+        .catch((err) => console.error(`Échec de la synchro de la guilde ${guild.id}:`, err))
+    )
+  );
 
   for (const mod of modules) {
     mod.register(readyClient);

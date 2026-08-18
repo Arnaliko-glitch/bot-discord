@@ -97,7 +97,8 @@ async function openTicketRequest(interaction: ButtonInteraction | ModalSubmitInt
   });
 
   if (!config.logChannelId) return;
-  const logChannel = await guild.channels.fetch(config.logChannelId).catch(() => null);
+  const logChannel =
+    guild.channels.cache.get(config.logChannelId) ?? (await guild.channels.fetch(config.logChannelId).catch(() => null));
   if (!logChannel?.isTextBased()) return;
 
   const embed = new EmbedBuilder()

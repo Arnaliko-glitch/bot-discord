@@ -17,9 +17,10 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
   }
 
+  // Mis en cache 30s côté serveur — voir la route /channels pour le détail.
   const res = await fetch(`https://discord.com/api/v10/guilds/${params.id}/emojis`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
-    cache: 'no-store',
+    next: { revalidate: 30 },
   });
   if (!res.ok) return NextResponse.json({ error: 'Impossible de récupérer les émojis' }, { status: 502 });
 

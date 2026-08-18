@@ -22,9 +22,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
   }
 
+  // Mis en cache 30s côté serveur (fetch natif Next.js) : évite de
+  // retaper l'API Discord à chaque navigation entre les pages du dashboard,
+  // qui rendait le chargement des salons perceptiblement lent.
   const res = await fetch(`https://discord.com/api/v10/guilds/${params.id}/channels`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
-    cache: 'no-store',
+    next: { revalidate: 30 },
   });
   if (!res.ok) return NextResponse.json({ error: 'Impossible de récupérer les salons' }, { status: 502 });
 

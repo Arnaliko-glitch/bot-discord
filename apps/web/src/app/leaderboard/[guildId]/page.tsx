@@ -15,7 +15,7 @@ interface DiscordRole {
 async function fetchGuildRoles(guildId: string): Promise<DiscordRole[]> {
   const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` },
-    cache: 'no-store',
+    next: { revalidate: 60 },
   });
   if (!res.ok) return [];
   return (await res.json()) as DiscordRole[];

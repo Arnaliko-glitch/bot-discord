@@ -158,7 +158,9 @@ async function updateActionMessage(interaction: TicketInteraction, ticket: Ticke
 
 async function logToTicketChannel(interaction: TicketInteraction, config: TicketConfig, embed: EmbedBuilder) {
   if (!config.logChannelId || !interaction.guild) return;
-  const channel = await interaction.guild.channels.fetch(config.logChannelId).catch(() => null);
+  const channel =
+    interaction.guild.channels.cache.get(config.logChannelId) ??
+    (await interaction.guild.channels.fetch(config.logChannelId).catch(() => null));
   if (channel?.isTextBased()) await channel.send({ embeds: [embed] }).catch(() => undefined);
 }
 
@@ -175,8 +177,10 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
   // l'autre (idem plus bas pour les effets de bord qui ne dépendent pas les
   // uns des autres : c'est ce qui rend l'action plus rapide à l'usage).
   const [creator, creatorMember] = await Promise.all([
-    interaction.client.users.fetch(ticket.creatorId).catch(() => null),
-    interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
+    interaction.client.users.cache.get(ticket.creatorId) ??
+      interaction.client.users.fetch(ticket.creatorId).catch(() => null),
+    interaction.guild.members.cache.get(ticket.creatorId) ??
+      interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
   ]);
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
@@ -249,7 +253,9 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
   if (!channel || !interaction.guild || !('send' in channel)) return;
 
   const reopenerName = resolveDisplayName(interaction);
-  const creatorMember = await interaction.guild.members.fetch(ticket.creatorId).catch(() => null);
+  const creatorMember =
+    interaction.guild.members.cache.get(ticket.creatorId) ??
+    (await interaction.guild.members.fetch(ticket.creatorId).catch(() => null));
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
   const newName = swapPrefix(channel.isThread() ? channel.name : (channel as { name: string }).name, CLOSED_PREFIX, REOPENED_PREFIX);
@@ -310,8 +316,10 @@ export async function deleteTicket(interaction: TicketInteraction, ticket: Ticke
 
   const deleterName = resolveDisplayName(interaction);
   const [creator, creatorMember] = await Promise.all([
-    interaction.client.users.fetch(ticket.creatorId).catch(() => null),
-    interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
+    interaction.client.users.cache.get(ticket.creatorId) ??
+      interaction.client.users.fetch(ticket.creatorId).catch(() => null),
+    interaction.guild.members.cache.get(ticket.creatorId) ??
+      interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
   ]);
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 

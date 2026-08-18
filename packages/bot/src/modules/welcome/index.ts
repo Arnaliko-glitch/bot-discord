@@ -31,7 +31,7 @@ async function handleJoinOrLeave(member: GuildMember, kind: 'welcome' | 'goodbye
 
   if (!enabled || !channelId) return;
 
-  const channel = await member.guild.channels.fetch(channelId).catch(() => null);
+  const channel = member.guild.channels.cache.get(channelId) ?? (await member.guild.channels.fetch(channelId).catch(() => null));
   if (!channel?.isTextBased()) return;
 
   const backgroundImagePath = kind === 'welcome' ? config.backgroundImage : config.goodbyeBackgroundImage;
