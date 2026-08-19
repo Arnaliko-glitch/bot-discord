@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   CircleHelp,
   Copy,
+  ExternalLink,
   FileText,
   GripVertical,
   Image as ImageIcon,
@@ -12,13 +14,20 @@ import {
   MousePointerClick,
   Palette,
   Plus,
+  Smile,
   SquareMenu,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
 import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
 import { EmojiPickerButton } from '@/components/EmojiPickerButton';
 import { MentionTextarea, renderMentionText, type RoleOption } from '@/components/MentionTextarea';
 import type { GuildEmoji } from '@/lib/emoji-data';
+
+// Même panneau que EmojiPickerButton, chargé à part ici pour piloter
+// nous-même l'icône du déclencheur (le smiley doit laisser place à l'emoji
+// choisi, ce qu'EmojiPickerButton ne permet pas).
+const EmojiPickerPanel = dynamic(() => import('./EmojiPickerPanel'), { ssr: false });
 
 export interface EmbedField {
   name: string;
@@ -36,6 +45,18 @@ export interface EmbedData {
   footerText: string | null;
 }
 
+export type ButtonStyleKey = 'blue' | 'gray' | 'green' | 'red';
+export type ButtonActionKey = 'ticket' | 'link';
+
+export interface MessageButtonData {
+  label: string;
+  emoji: string | null;
+  style: ButtonStyleKey;
+  disabled: boolean;
+  action: ButtonActionKey | null;
+  url: string | null;
+}
+
 export interface MessageData {
   id: string;
   name: string;
@@ -43,6 +64,7 @@ export interface MessageData {
   content: string | null;
   embedData: EmbedData[];
   imageUrls: string[];
+  buttons: MessageButtonData[];
   lastSentMessageId: string | null;
   lastSentChannelId: string | null;
 }
@@ -51,6 +73,8 @@ const EMBED_COLOR_SWATCHES = ['#ED4245', '#57F287', '#5865F2', '#F0A020'];
 const DEFAULT_EMBED_COLOR = '#5865F2';
 const MAX_IMAGES = 10;
 const MAX_EMBEDS = 5;
+// Discord n'autorise que 5 boutons par ligne — on ne gère qu'une seule ligne.
+const MAX_BUTTONS = 5;
 
 const BLANK_EMBED: EmbedData = {
   authorName: null,
@@ -63,13 +87,33 @@ const BLANK_EMBED: EmbedData = {
   footerText: null,
 };
 
+const BLANK_BUTTON: MessageButtonData = {
+  label: '',
+  emoji: null,
+  style: 'blue',
+  disabled: false,
+  action: null,
+  url: null,
+};
+
+// Couleurs réelles des boutons Discord (styles Primary/Secondary/Success/Danger).
+const BUTTON_STYLE_OPTIONS: { key: ButtonStyleKey; label: string; color: string }[] = [
+  { key: 'blue', label: 'Bleu', color: '#5865F2' },
+  { key: 'gray', label: 'Gris', color: '#4E5058' },
+  { key: 'green', label: 'Vert', color: '#248046' },
+  { key: 'red', label: 'Rouge', color: '#DA373C' },
+];
+const BUTTON_COLORS: Record<ButtonStyleKey, string> = Object.fromEntries(
+  BUTTON_STYLE_OPTIONS.map((o) => [o.key, o.color])
+) as Record<ButtonStyleKey, string>;
+
 type Tab = 'content' | 'image' | 'embed' | 'button' | 'selector';
 
 const TABS: { key: Tab; label: string; icon: typeof FileText; disabled?: boolean }[] = [
   { key: 'content', label: 'Contenu', icon: FileText },
   { key: 'image', label: 'Image', icon: ImageIcon },
   { key: 'embed', label: 'Embed', icon: LayoutGrid },
-  { key: 'button', label: 'Bouton', icon: MousePointerClick, disabled: true },
+  { key: 'button', label: 'Bouton', icon: MousePointerClick },
   { key: 'selector', label: 'Sélecteur', icon: SquareMenu, disabled: true },
 ];
 
@@ -81,17 +125,20 @@ function emptyDraft(name: string): MessageData {
     content: null,
     embedData: [],
     imageUrls: [],
+    buttons: [],
     lastSentMessageId: null,
     lastSentChannelId: null,
   };
 }
 
-// Le champ `embedData` en base est un JSON nullable : Prisma renvoie `null`
-// tant qu'aucun embed n'a été sauvegardé, alors que le composant attend
-// toujours un tableau. Toute réponse d'API doit passer par ici avant d'être
-// traitée comme un MessageData.
-function normalizeMessage(raw: Omit<MessageData, 'embedData'> & { embedData: EmbedData[] | null }): MessageData {
-  return { ...raw, embedData: raw.embedData ?? [] };
+// Les champs `embedData`/`buttons` en base sont des JSON nullables : Prisma
+// renvoie `null` tant que rien n'a été sauvegardé, alors que le composant
+// attend toujours des tableaux. Toute réponse d'API doit passer par ici
+// avant d'être traitée comme un MessageData.
+function normalizeMessage(
+  raw: Omit<MessageData, 'embedData' | 'buttons'> & { embedData: EmbedData[] | null; buttons: MessageButtonData[] | null }
+): MessageData {
+  return { ...raw, embedData: raw.embedData ?? [], buttons: raw.buttons ?? [] };
 }
 
 // Discord limite la somme de tous les caractères (titre + description +
@@ -158,6 +205,9 @@ export function MessagesConfigPage({
   const [activeTab, setActiveTab] = useState<Tab>('content');
   const [contentVisible, setContentVisible] = useState(true);
   const [imagePopupOpen, setImagePopupOpen] = useState(false);
+  // Index du bouton en cours d'édition dans la modale, 'new' pour un ajout,
+  // null quand la modale est fermée.
+  const [editingButtonIndex, setEditingButtonIndex] = useState<number | 'new' | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [guildEmojis, setGuildEmojis] = useState<GuildEmoji[]>([]);
@@ -189,7 +239,11 @@ export function MessagesConfigPage({
     setLastSaved(JSON.stringify(m));
     setStatusMessage('');
     setImagePopupOpen(false);
-    setContentVisible(true);
+    setEditingButtonIndex(null);
+    // La zone de contenu ne doit réapparaître que si ce message en a
+    // vraiment un — sinon on écrase le fait de l'avoir volontairement vidée
+    // à chaque fois qu'on rouvre ce message pour le modifier.
+    setContentVisible(Boolean(m.content));
   }
 
   function update<K extends keyof MessageData>(key: K, value: MessageData[K]) {
@@ -267,12 +321,30 @@ export function MessagesConfigPage({
     if (tab === 'image' && draft.imageUrls.length < MAX_IMAGES) {
       setImagePopupOpen(true);
     }
+    // Chaque clic sur l'onglet "Bouton" ouvre directement la modale d'ajout.
+    if (tab === 'button' && draft.buttons.length < MAX_BUTTONS) {
+      setEditingButtonIndex('new');
+    }
+  }
+
+  function addButton(button: MessageButtonData) {
+    setDraft((d) => ({ ...d, buttons: [...d.buttons, button] }));
+  }
+
+  function updateButtonAt(index: number, button: MessageButtonData) {
+    setDraft((d) => ({ ...d, buttons: d.buttons.map((b, i) => (i === index ? button : b)) }));
+  }
+
+  function removeButtonAt(index: number) {
+    setDraft((d) => ({ ...d, buttons: d.buttons.filter((_, i) => i !== index) }));
   }
 
   function removeEmbed(index: number) {
     const target = draft.embedData[index];
-    deleteServerFile(guildId, target?.imageUrl);
-    deleteServerFile(guildId, target?.thumbnailUrl);
+    // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde (voir
+    // save()), pas ici — sinon "Annuler" ne peut plus la restaurer.
+    if (target?.imageUrl && !isSavedImageUrl(target.imageUrl)) deleteServerFile(guildId, target.imageUrl);
+    if (target?.thumbnailUrl && !isSavedImageUrl(target.thumbnailUrl)) deleteServerFile(guildId, target.thumbnailUrl);
     setDraft((d) => ({ ...d, embedData: d.embedData.filter((_, i) => i !== index) }));
   }
 
@@ -290,6 +362,19 @@ export function MessagesConfigPage({
   const isDirty = JSON.stringify(draft) !== lastSaved;
   const canModifyLastSent = Boolean(draft.lastSentMessageId && draft.lastSentChannelId === draft.channelId);
 
+  // Une image encore présente dans la dernière version enregistrée ne doit
+  // jamais être supprimée du serveur avant que le remplacement/retrait ne
+  // soit confirmé par "Sauvegarder" — sinon "Annuler" ne peut plus la
+  // restaurer (le fichier n'existe déjà plus). Seules les images ajoutées
+  // dans la session en cours (jamais enregistrées) peuvent être nettoyées
+  // immédiatement quand on les remplace ou retire.
+  function isSavedImageUrl(url: string | null): boolean {
+    if (!url) return false;
+    const saved = JSON.parse(lastSaved) as MessageData;
+    if (saved.imageUrls.includes(url)) return true;
+    return saved.embedData.some((e) => e.imageUrl === url || e.thumbnailUrl === url);
+  }
+
   async function createDraft() {
     const res = await fetch(`/api/guilds/${guildId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     if (!res.ok) return;
@@ -302,6 +387,7 @@ export function MessagesConfigPage({
     if (!draft.id) return null;
     setSaving(true);
     setStatusMessage('');
+    const previous = JSON.parse(lastSaved) as MessageData;
     const res = await fetch(`/api/guilds/${guildId}/messages/${draft.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -313,6 +399,17 @@ export function MessagesConfigPage({
       return null;
     }
     const updated = normalizeMessage(await res.json());
+    // Les images de l'ancienne version qui ne servent plus nulle part dans
+    // la nouvelle deviennent orphelines maintenant que le changement est
+    // confirmé (remplacement ou retrait) — c'est le seul moment où on peut
+    // les supprimer sans casser un éventuel "Annuler" fait avant cette sauvegarde.
+    const keptUrls = new Set(
+      [...updated.imageUrls, ...updated.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl])].filter(Boolean)
+    );
+    const previousUrls = [...previous.imageUrls, ...previous.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl])];
+    for (const url of previousUrls) {
+      if (url && !keptUrls.has(url)) deleteServerFile(guildId, url);
+    }
     setMessages((list) => list.map((m) => (m.id === updated.id ? updated : m)));
     setDraft(updated);
     setLastSaved(JSON.stringify(updated));
@@ -369,8 +466,6 @@ export function MessagesConfigPage({
       }
     }
   }
-
-  const drafts = messages.filter((m) => !m.lastSentMessageId);
 
   return (
     <div className="space-y-8 pb-8">
@@ -480,6 +575,7 @@ export function MessagesConfigPage({
                           onChange={(v) => update('imageUrls', v)}
                           open={imagePopupOpen}
                           onOpenChange={handleImagePopupChange}
+                          isSavedUrl={isSavedImageUrl}
                         />
                       </div>
                       <div className="h-7 w-7 shrink-0" />
@@ -606,6 +702,7 @@ export function MessagesConfigPage({
                                 guildId={guildId}
                                 value={embed.thumbnailUrl}
                                 onChange={(v) => updateEmbedAt(index, 'thumbnailUrl', v)}
+                                isSavedUrl={isSavedImageUrl}
                                 size="small"
                               />
                             </div>
@@ -614,6 +711,7 @@ export function MessagesConfigPage({
                               guildId={guildId}
                               value={embed.imageUrl}
                               onChange={(v) => updateEmbedAt(index, 'imageUrl', v)}
+                              isSavedUrl={isSavedImageUrl}
                               size="large"
                             />
 
@@ -654,6 +752,23 @@ export function MessagesConfigPage({
                       ))}
                     </div>
                   )}
+
+                  {draft.buttons.length > 0 && (
+                    <div className="flex items-start gap-1.5">
+                      <div className="h-7 w-7 shrink-0" />
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        {draft.buttons.map((button, index) => (
+                          <ButtonPreview
+                            key={index}
+                            button={button}
+                            onEdit={() => setEditingButtonIndex(index)}
+                            onRemove={() => removeButtonAt(index)}
+                          />
+                        ))}
+                      </div>
+                      <div className="h-7 w-7 shrink-0" />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -669,6 +784,7 @@ export function MessagesConfigPage({
                   if (tab.key === 'content') return !contentVisible;
                   if (tab.key === 'image') return draft.imageUrls.length < MAX_IMAGES;
                   if (tab.key === 'embed') return draft.embedData.length < MAX_EMBEDS;
+                  if (tab.key === 'button') return draft.buttons.length < MAX_BUTTONS;
                   return true;
                 }).map((tab) => (
                   <button
@@ -741,51 +857,11 @@ export function MessagesConfigPage({
         <div className="space-y-6">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Brouillons</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Messages</span>
               <button type="button" onClick={createDraft} className="btn-secondary text-xs">
                 Nouveau brouillon
               </button>
             </div>
-            <div className="space-y-2">
-              {drafts.length === 0 && <p className="text-sm text-gray-500">Aucun brouillon.</p>}
-              {drafts.map((m) => (
-                <div
-                  key={m.id}
-                  onClick={() => selectMessage(m)}
-                  className={`card block w-full cursor-pointer p-3 text-left text-sm transition hover:border-[var(--accent)] ${
-                    selectedId === m.id ? 'border-[var(--accent)] text-white' : ''
-                  }`}
-                >
-                  {editingNameId === m.id ? (
-                    <input
-                      autoFocus
-                      value={editingNameValue}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleNameInputChange(m.id, e.target.value)}
-                      onBlur={() => finishEditingName(m.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                      }}
-                      className="-mx-2 -my-1 w-full rounded border border-[var(--accent)] bg-transparent px-2 py-1 text-sm text-white outline-none"
-                    />
-                  ) : (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEditingName(m);
-                      }}
-                      className="-mx-2 -my-1 block truncate rounded border border-transparent px-2 py-1 transition hover:border-white/20"
-                    >
-                      {m.name}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">Messages</span>
             <div className="space-y-2">
               {messages.length === 0 && <p className="text-sm text-gray-500">Aucun message.</p>}
               {messages.map((m) => {
@@ -839,6 +915,28 @@ export function MessagesConfigPage({
         </div>
       </div>
 
+      {editingButtonIndex !== null && (
+        <ButtonEditorModal
+          guildName={guildName}
+          guildIconUrl={guildIconUrl}
+          guildEmojis={guildEmojis}
+          initial={editingButtonIndex === 'new' ? null : draft.buttons[editingButtonIndex]}
+          onCancel={() => setEditingButtonIndex(null)}
+          onDelete={
+            editingButtonIndex === 'new'
+              ? undefined
+              : () => {
+                  removeButtonAt(editingButtonIndex);
+                  setEditingButtonIndex(null);
+                }
+          }
+          onSave={(button) => {
+            if (editingButtonIndex === 'new') addButton(button);
+            else updateButtonAt(editingButtonIndex, button);
+            setEditingButtonIndex(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1048,61 +1146,71 @@ function ImageUploadModal({
 // Emplacement image cliquable dans l'embed — grand format pour l'image
 // principale, petit carré pour la vignette. Le clic ouvre la même popup de
 // dépôt/collage que l'image autonome du message (pas un sélecteur de
-// fichier natif) ; un second clic une fois l'image en place la retire.
+// fichier natif) ; une fois l'image en place, cliquer dessus rouvre la popup
+// pour la remplacer, l'icône corbeille (au survol) la retire.
 function EmbedImageSlot({
   guildId,
   value,
   onChange,
+  isSavedUrl,
   size,
 }: {
   guildId: string;
   value: string | null;
   onChange: (url: string | null) => void;
+  isSavedUrl: (url: string | null) => boolean;
   size: 'small' | 'large';
 }) {
   const [open, setOpen] = useState(false);
 
-  if (value) {
-    return (
-      <div className={`group/img relative shrink-0 overflow-hidden rounded ${size === 'small' ? 'h-16 w-16' : 'w-full'}`}>
-        <img src={value} alt="" className={size === 'small' ? 'h-16 w-16 object-cover' : 'max-h-52 w-full object-cover'} />
-        <button
-          type="button"
-          onClick={() => {
-            deleteServerFile(guildId, value);
-            onChange(null);
-          }}
-          title="Retirer l'image"
-          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
-      </div>
-    );
+  // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde globale
+  // (voir save() dans MessagesConfigPage) — sinon "Annuler" ne peut plus la
+  // restaurer. Seul un upload de cette session, jamais sauvegardé, peut être
+  // supprimé tout de suite quand on le remplace ou le retire.
+  function handleUploaded(urls: string[]) {
+    if (!urls[0]) return;
+    if (value && !isSavedUrl(value)) deleteServerFile(guildId, value);
+    onChange(urls[0]);
+    setOpen(false);
   }
 
   return (
     <div className={`relative shrink-0 ${size === 'small' ? '' : 'w-full'}`}>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Ajouter une image"
-        className={`flex items-center justify-center rounded border border-dashed border-white/20 text-gray-600 transition hover:border-[var(--accent)] hover:text-gray-400 ${
-          size === 'small' ? 'h-16 w-16' : 'h-32 w-full'
-        }`}
-      >
-        <ImageIcon className={size === 'small' ? 'h-5 w-5' : 'h-6 w-6'} />
-      </button>
-      {open && (
-        <ImageUploadModal
-          guildId={guildId}
-          onUploaded={(urls) => {
-            if (urls[0]) onChange(urls[0]);
-            setOpen(false);
-          }}
-          onClose={() => setOpen(false)}
-        />
+      {value ? (
+        <div className={`group/img relative overflow-hidden rounded ${size === 'small' ? 'h-16 w-16' : 'w-full'}`}>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            title="Remplacer l'image"
+            className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
+          >
+            <img src={value} alt="" className={size === 'small' ? 'h-16 w-16 object-cover' : 'max-h-52 w-full object-cover'} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isSavedUrl(value)) deleteServerFile(guildId, value);
+              onChange(null);
+            }}
+            title="Retirer l'image"
+            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Ajouter une image"
+          className={`flex items-center justify-center rounded border border-dashed border-white/20 text-gray-600 transition hover:border-[var(--accent)] hover:text-gray-400 ${
+            size === 'small' ? 'h-16 w-16' : 'h-32 w-full'
+          }`}
+        >
+          <ImageIcon className={size === 'small' ? 'h-5 w-5' : 'h-6 w-6'} />
+        </button>
       )}
+      {open && <ImageUploadModal guildId={guildId} onUploaded={handleUploaded} onClose={() => setOpen(false)} />}
     </div>
   );
 }
@@ -1116,6 +1224,7 @@ function ImageTile({
   guildId,
   urls,
   onChange,
+  isSavedUrl,
   dragIndex,
   isDragOver,
   onDragOverTile,
@@ -1130,6 +1239,7 @@ function ImageTile({
   guildId: string;
   urls: string[];
   onChange: (urls: string[]) => void;
+  isSavedUrl: (url: string | null) => boolean;
   dragIndex: React.MutableRefObject<number | null>;
   isDragOver: boolean;
   onDragOverTile: (index: number | null) => void;
@@ -1139,8 +1249,14 @@ function ImageTile({
   tileClassName: string;
   imgClassName?: string;
 }) {
+  const [replaceOpen, setReplaceOpen] = useState(false);
+
+  // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde globale
+  // (voir save() dans MessagesConfigPage) — sinon "Annuler" ne peut plus la
+  // restaurer. Seul un upload de cette session, jamais sauvegardé, peut être
+  // supprimé tout de suite quand on le remplace ou le retire.
   function removeAt(i: number) {
-    deleteServerFile(guildId, urls[i]);
+    if (!isSavedUrl(urls[i])) deleteServerFile(guildId, urls[i]);
     onChange(urls.filter((_, idx) => idx !== i));
   }
 
@@ -1150,6 +1266,15 @@ function ImageTile({
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
     onChange(next);
+  }
+
+  function replaceWith(newUrls: string[]) {
+    if (!newUrls[0]) return;
+    if (!isSavedUrl(urls[index])) deleteServerFile(guildId, urls[index]);
+    const next = [...urls];
+    next[index] = newUrls[0];
+    onChange(next);
+    setReplaceOpen(false);
   }
 
   return (
@@ -1167,7 +1292,15 @@ function ImageTile({
         onDragOverTile(null);
       }}
     >
-      <img src={url} alt="" className={imgClassName} />
+      <button
+        type="button"
+        onClick={() => setReplaceOpen(true)}
+        title="Remplacer l'image"
+        className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
+      >
+        <img src={url} alt="" className={imgClassName} />
+      </button>
+      {replaceOpen && <ImageUploadModal guildId={guildId} onUploaded={replaceWith} onClose={() => setReplaceOpen(false)} />}
       <div
         draggable
         onDragStart={() => {
@@ -1211,12 +1344,14 @@ function ImageGrid({
   guildId,
   urls,
   onChange,
+  isSavedUrl,
   open,
   onOpenChange,
 }: {
   guildId: string;
   urls: string[];
   onChange: (urls: string[]) => void;
+  isSavedUrl: (url: string | null) => boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -1239,6 +1374,7 @@ function ImageGrid({
           guildId={guildId}
           urls={urls}
           onChange={onChange}
+          isSavedUrl={isSavedUrl}
           dragIndex={dragIndex}
           isDragOver={dragOverIndex === i}
           onDragOverTile={setDragOverIndex}
@@ -1273,6 +1409,307 @@ function ImageGrid({
           onClose={() => onOpenChange(false)}
         />
       )}
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? 'bg-[var(--accent)]' : 'bg-gray-600'}`}
+    >
+      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${checked ? 'left-5' : 'left-0.5'}`} />
+    </button>
+  );
+}
+
+// Affiche un emoji picoché pour le bouton — glyphe unicode direct, ou image
+// CDN pour un émoji personnalisé du serveur (même tag `<a?:nom:id>` que
+// celui déjà géré par renderMentionText).
+function ButtonEmojiGlyph({ emoji }: { emoji: string }) {
+  const match = /^<(a?):(\w+):(\d+)>$/.exec(emoji);
+  if (match) {
+    const [, animated, name, id] = match;
+    return (
+      <img
+        src={`https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=32`}
+        alt={name}
+        className="h-4 w-4"
+      />
+    );
+  }
+  return <span className="text-sm leading-none">{emoji}</span>;
+}
+
+// Déclencheur du picker d'emoji du bouton : contrairement à EmojiPickerButton
+// (icône smiley fixe), celui-ci affiche l'emoji choisi à la place du smiley
+// une fois qu'il y en a un, comme dans DraftBot.
+function ButtonEmojiPicker({
+  guildName,
+  guildIconUrl,
+  guildEmojis,
+  value,
+  onChange,
+}: {
+  guildName: string;
+  guildIconUrl: string | null;
+  guildEmojis: GuildEmoji[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-6 w-6 items-center justify-center text-gray-500 hover:text-gray-300"
+      >
+        {value ? <ButtonEmojiGlyph emoji={value} /> : <Smile className="h-4 w-4" />}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1">
+          <EmojiPickerPanel
+            guildName={guildName}
+            guildIconUrl={guildIconUrl}
+            guildEmojis={guildEmojis}
+            onPick={(text) => {
+              onChange(text);
+              setOpen(false);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Rendu non-interactif d'un bouton dans l'aperçu — la vraie couleur/le vrai
+// texte du bouton Discord, avec les actions (modifier/retirer) au survol.
+function ButtonPreview({
+  button,
+  onEdit,
+  onRemove,
+}: {
+  button: MessageButtonData;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  // Discord force le style "Link" (toujours gris + icône de lien sortant)
+  // pour un bouton avec URL, quelle que soit la couleur choisie — l'aperçu
+  // doit refléter le vrai rendu, pas la couleur enregistrée mais inactive.
+  const isLink = button.action === 'link';
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-[3px] px-4 py-2 text-sm font-medium text-white ${
+          button.disabled ? 'opacity-50' : ''
+        }`}
+        style={{ backgroundColor: isLink ? BUTTON_COLORS.gray : BUTTON_COLORS[button.style] }}
+      >
+        {button.emoji && <ButtonEmojiGlyph emoji={button.emoji} />}
+        {button.label || 'Bouton'}
+        {isLink && <ExternalLink className="h-3.5 w-3.5" />}
+      </span>
+      <button type="button" onClick={onEdit} className="btn-secondary px-3 py-1.5 text-xs">
+        Modifier
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Retirer le bouton"
+        className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white hover:bg-black/80"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// Modale d'ajout/modification d'un bouton, façon DraftBot : bouton (emoji +
+// titre), couleur, désactivation, puis l'action déclenchée au clic. Seules
+// deux actions sont supportées pour l'instant : ouvrir un ticket (réutilise
+// le système de tickets existant, un seul bouton "ticket:create" par serveur)
+// et rediriger vers un lien (bouton natif Discord de type "Link").
+function ButtonEditorModal({
+  guildName,
+  guildIconUrl,
+  guildEmojis,
+  initial,
+  onCancel,
+  onSave,
+  onDelete,
+}: {
+  guildName: string;
+  guildIconUrl: string | null;
+  guildEmojis: GuildEmoji[];
+  initial: MessageButtonData | null;
+  onCancel: () => void;
+  onSave: (button: MessageButtonData) => void;
+  onDelete?: () => void;
+}) {
+  const [label, setLabel] = useState(initial?.label ?? '');
+  const [emoji, setEmoji] = useState<string | null>(initial?.emoji ?? null);
+  const [style, setStyle] = useState<ButtonStyleKey>(initial?.style ?? 'blue');
+  const [disabled, setDisabled] = useState(initial?.disabled ?? false);
+  const [action, setAction] = useState<ButtonActionKey | ''>(initial?.action ?? '');
+  const [url, setUrl] = useState(initial?.url ?? '');
+  const [error, setError] = useState('');
+
+  function handleValidate() {
+    if (!label.trim()) {
+      setError('Le titre du bouton est requis.');
+      return;
+    }
+    if (!action) {
+      setError("Choisissez une action.");
+      return;
+    }
+    const trimmedUrl = url.trim();
+    if (action === 'link' && !/^https?:\/\//i.test(trimmedUrl)) {
+      setError("L'URL doit commencer par http:// ou https://");
+      return;
+    }
+    onSave({
+      label: label.trim().slice(0, 80),
+      emoji,
+      style,
+      disabled,
+      action,
+      url: action === 'link' ? trimmedUrl : null,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#1a1d23] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-5 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-white">
+            {initial ? "Modifier l'interaction de bouton" : 'Ajouter une interaction de bouton'}
+          </h2>
+
+          <div className="space-y-1.5">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Bouton</span>
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#2b2d31] px-3 py-2.5">
+              <ButtonEmojiPicker
+                guildName={guildName}
+                guildIconUrl={guildIconUrl}
+                guildEmojis={guildEmojis}
+                value={emoji}
+                onChange={setEmoji}
+              />
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value.slice(0, 80))}
+                placeholder="Titre du bouton"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-white outline-none placeholder:text-gray-500"
+              />
+            </div>
+          </div>
+
+          {action === 'link' ? (
+            // Discord impose le style "Link" pour un bouton avec URL — la
+            // couleur n'est pas personnalisable, comme chez DraftBot.
+            <div className="flex items-center gap-2 rounded-lg border border-[#F0A020]/40 bg-[#F0A020]/10 px-3 py-2.5 text-sm text-[#F0A020]">
+              <TriangleAlert className="h-4 w-4 shrink-0" />
+              Le changement de couleur n&apos;est pas possible pour les boutons de lien
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Couleur du bouton</span>
+              <div className="grid grid-cols-4 gap-2">
+                {BUTTON_STYLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setStyle(opt.key)}
+                    className={`rounded-lg py-2 text-sm font-medium text-white transition ring-2 ring-offset-2 ring-offset-[#1a1d23] ${
+                      style === opt.key ? 'ring-white' : 'ring-transparent'
+                    }`}
+                    style={{ backgroundColor: opt.color }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Toggle checked={disabled} onChange={setDisabled} />
+              <span className="text-sm font-semibold uppercase tracking-wide text-white">Désactiver le bouton</span>
+              <span title="Les membres ne pourront plus utiliser le bouton.">
+                <CircleHelp className="h-3.5 w-3.5 cursor-help text-gray-600" />
+              </span>
+            </div>
+            <p className="pl-[52px] text-xs text-gray-500">Les membres ne pourront plus utiliser le bouton.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Action</span>
+            <select
+              value={action}
+              onChange={(e) => setAction(e.target.value as ButtonActionKey | '')}
+              className="input"
+            >
+              <option value="">Veuillez choisir le type d&apos;action</option>
+              <option value="ticket">Ouvrir un ticket</option>
+              <option value="link">Rediriger vers un lien</option>
+            </select>
+          </div>
+
+          {action === 'link' && (
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Lien du bouton</span>
+              <input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Lien vers lequel l'utilisateur sera envoyé"
+                className="input"
+              />
+            </div>
+          )}
+
+          {action === 'ticket' && (
+            <p className="text-xs text-gray-500">
+              Ouvre un ticket comme le fait le module Tickets — assurez-vous qu&apos;il est activé pour ce serveur.
+            </p>
+          )}
+
+          {error && <p className="text-xs text-[#ED4245]">{error}</p>}
+        </div>
+
+        <div className="flex items-center justify-end gap-4 border-t border-white/10 px-5 py-3">
+          {onDelete && (
+            <button type="button" onClick={onDelete} className="mr-auto text-sm text-[#ED4245] hover:underline">
+              Supprimer
+            </button>
+          )}
+          <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-200">
+            Annuler
+          </button>
+          <button type="button" onClick={handleValidate} className="btn-primary text-sm">
+            Valider
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

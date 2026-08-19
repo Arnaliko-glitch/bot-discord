@@ -23,6 +23,17 @@ import { startPresenceRotation } from './modules/presence.js';
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
 
+// Le dashboard (process web séparé) lit cette ligne pour savoir si le bot
+// est réellement en ligne — un `/users/@me` réussi prouverait juste que le
+// token est valide, pas que le process tourne. Fréquence alignée sur le
+// seuil "hors ligne" côté dashboard (voir apps/web/src/lib/discord-bot.ts).
+const HEARTBEAT_INTERVAL_MS = 30_000;
+function sendHeartbeat() {
+  prisma.botHeartbeat
+    .upsert({ where: { id: 'singleton' }, create: { id: 'singleton', updatedAt: new Date() }, update: { updatedAt: new Date() } })
+    .catch((err) => console.error('Heartbeat échoué:', err));
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -112,6 +123,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log('Module "tickets" enregistré');
 
   startPresenceRotation(readyClient);
+
+  sendHeartbeat();
+  setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 });
 
 client.on(Events.GuildCreate, (guild) => {

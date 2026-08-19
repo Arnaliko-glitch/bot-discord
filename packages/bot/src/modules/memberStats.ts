@@ -51,10 +51,14 @@ export const memberStatsModule: BotModuleHandler = {
   name: 'memberStats',
   register(client: BotClient) {
     client.on(Events.GuildMemberAdd, (member) => {
+      // Exclus les bots : la tuile "Membre total" du dashboard ne compte que
+      // les humains (fetchGuildMembers filtre .user.bot) — sans ce filtre,
+      // l'ajout d'un bot ferait un blip incohérent avec le total affiché.
+      if (member.user.bot) return;
       recordJoin(member.guild.id);
     });
     client.on(Events.GuildMemberRemove, (member) => {
-      if (!member.guild) return;
+      if (!member.guild || (member as GuildMember).user.bot) return;
       recordLeave((member as GuildMember).guild.id);
     });
 

@@ -1,6 +1,6 @@
 import { prisma } from '@discord-bot-dashboard/database';
 import { getBotIdentity } from '@/lib/discord-bot';
-import { MessagesConfigPage, type EmbedData } from '@/components/MessagesConfigPage';
+import { MessagesConfigPage, type EmbedData, type MessageButtonData } from '@/components/MessagesConfigPage';
 
 const BLANK_EMBED: EmbedData = {
   authorName: null,
@@ -13,6 +13,15 @@ const BLANK_EMBED: EmbedData = {
   footerText: null,
 };
 
+const BLANK_BUTTON: MessageButtonData = {
+  label: '',
+  emoji: null,
+  style: 'blue',
+  disabled: false,
+  action: null,
+  url: null,
+};
+
 // Les messages enregistrés avant le passage aux embeds multiples stockent un
 // objet unique en base ; on le normalise ici en tableau (et on complète les
 // champs manquants) pour que le composant n'ait jamais à gérer les deux formes.
@@ -20,6 +29,11 @@ function normalizeEmbeds(raw: unknown): EmbedData[] {
   if (!raw) return [];
   const arr = Array.isArray(raw) ? raw : [raw];
   return arr.slice(0, 5).map((e) => ({ ...BLANK_EMBED, ...(e as Partial<EmbedData>) }));
+}
+
+function normalizeButtons(raw: unknown): MessageButtonData[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 5).map((b) => ({ ...BLANK_BUTTON, ...(b as Partial<MessageButtonData>) }));
 }
 
 export default async function MessagesPage({ params }: { params: { guildId: string } }) {
@@ -46,6 +60,7 @@ export default async function MessagesPage({ params }: { params: { guildId: stri
         content: m.content,
         embedData: normalizeEmbeds(m.embedData),
         imageUrls: m.imageUrls,
+        buttons: normalizeButtons(m.buttons),
         lastSentMessageId: m.lastSentMessageId,
         lastSentChannelId: m.lastSentChannelId,
       }))}

@@ -30,6 +30,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       content:
         body.content !== undefined ? (body.content != null ? String(body.content).slice(0, 2000) : null) : existing.content,
       embedData: body.embedData !== undefined ? body.embedData : existing.embedData ?? undefined,
+      buttons: body.buttons !== undefined ? body.buttons : existing.buttons ?? undefined,
       imageUrls:
         body.imageUrls !== undefined
           ? Array.isArray(body.imageUrls)

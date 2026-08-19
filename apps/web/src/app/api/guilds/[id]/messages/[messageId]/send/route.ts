@@ -32,6 +32,61 @@ interface EmbedData {
   footerText?: string | null;
 }
 
+interface ButtonData {
+  label?: string | null;
+  emoji?: string | null;
+  style?: 'blue' | 'gray' | 'green' | 'red';
+  disabled?: boolean;
+  action?: 'ticket' | 'link' | null;
+  url?: string | null;
+}
+
+// Doit rester synchronisé avec TICKET_CREATE_BUTTON_ID dans
+// packages/bot/src/modules/tickets/constants.ts — l'écouteur d'interactions
+// du bot reconnaît ce customId indépendamment du message/salon d'origine, un
+// seul bouton "ouvrir un ticket" suffit donc pour tout le serveur.
+const TICKET_CREATE_BUTTON_ID = 'ticket:create';
+
+const BUTTON_STYLE_TO_DISCORD: Record<string, number> = { blue: 1, gray: 2, green: 3, red: 4 };
+
+function parseButtonEmoji(raw: string): Record<string, unknown> {
+  const custom = /^<(a?):(\w+):(\d+)>$/.exec(raw);
+  if (custom) {
+    const [, animated, name, id] = custom;
+    return { id, name, animated: animated === 'a' };
+  }
+  return { name: raw };
+}
+
+function buildButtonComponent(button: ButtonData): Record<string, unknown> | null {
+  if (!button.action) return null;
+
+  const component: Record<string, unknown> = { type: 2, disabled: Boolean(button.disabled) };
+  if (button.label) component.label = button.label.slice(0, 80);
+  if (button.emoji) component.emoji = parseButtonEmoji(button.emoji);
+
+  if (button.action === 'link') {
+    if (!button.url) return null;
+    // Discord impose le style "Link" (5) dès qu'une URL est fournie — la
+    // couleur choisie dans l'éditeur n'a aucun effet visuel pour ce type.
+    component.style = 5;
+    component.url = button.url;
+  } else {
+    component.style = BUTTON_STYLE_TO_DISCORD[button.style ?? 'blue'] ?? 1;
+    component.custom_id = TICKET_CREATE_BUTTON_ID;
+  }
+  return component;
+}
+
+function buildComponents(raw: unknown): Record<string, unknown>[] {
+  const buttons = (Array.isArray(raw) ? raw : []) as ButtonData[];
+  const components = buttons
+    .slice(0, 5)
+    .map(buildButtonComponent)
+    .filter((c): c is Record<string, unknown> => c !== null);
+  return components.length > 0 ? [{ type: 1, components }] : [];
+}
+
 function toAbsoluteUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
@@ -63,7 +118,8 @@ function buildDiscordPayload(message: {
   content: string | null;
   embedData: unknown;
   imageUrls: string[];
-}): { content?: string; embeds: Record<string, unknown>[] } {
+  buttons: unknown;
+}): { content?: string; embeds: Record<string, unknown>[]; components: Record<string, unknown>[] } {
   const embeds = normalizeEmbeds(message.embedData)
     .slice(0, 5)
     .map(buildOneEmbed)
@@ -72,6 +128,9 @@ function buildDiscordPayload(message: {
   return {
     content: message.content ?? undefined,
     embeds,
+    // Toujours explicite (même vide) : sur une édition, l'omettre laisserait
+    // Discord garder d'anciens boutons retirés depuis côté dashboard.
+    components: buildComponents(message.buttons),
   };
 }
 
@@ -114,7 +173,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!message.channelId) return NextResponse.json({ error: 'Choisissez un salon avant d\'envoyer.' }, { status: 400 });
 
   const payload = buildDiscordPayload(message);
-  if (!payload.content && payload.embeds.length === 0 && message.imageUrls.length === 0) {
+  if (!payload.content && payload.embeds.length === 0 && message.imageUrls.length === 0 && payload.components.length === 0) {
     return NextResponse.json({ error: 'Le message est vide.' }, { status: 400 });
   }
 

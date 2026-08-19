@@ -315,3 +315,12 @@ model ServerTagConfig {
   updatedAt DateTime
   Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
+
+// Ligne unique mise à jour périodiquement par le process du bot (voir
+// packages/bot/src/index.ts) — permet au dashboard (process web séparé) de
+// savoir si le bot est réellement connecté à Discord, pas juste si le token
+// est valide (le rond "Connecté" de la sidebar).
+model BotHeartbeat {
+  id        String   @id @default("singleton")
+  updatedAt DateTime
+}

@@ -30,6 +30,7 @@ export function DashboardShell(props: {
   guildIcon: string | null;
   username: string;
   userAvatarUrl: string;
+  botOnline: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -45,6 +46,7 @@ function DashboardShellContent({
   guildIcon,
   username,
   userAvatarUrl,
+  botOnline,
   children,
 }: {
   guildId: string;
@@ -52,6 +54,7 @@ function DashboardShellContent({
   guildIcon: string | null;
   username: string;
   userAvatarUrl: string;
+  botOnline: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -83,7 +86,10 @@ function DashboardShellContent({
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--card)] py-4">
         <div className="flex items-center justify-between px-4">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#57F287]" title="Connecté" />
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${botOnline ? 'bg-[#57F287]' : 'bg-gray-600'}`}
+            title={botOnline ? 'Bot connecté' : 'Bot hors ligne'}
+          />
           <Link
             href="/dashboard"
             onClick={(e) => guardedNavigate(e, '/dashboard')}
