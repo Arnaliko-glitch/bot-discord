@@ -8,6 +8,7 @@ const PHRASES = [
   '💫 Toujours Là',
   '🎫 Gère Les Tickets',
   '🔔 Service Disponible',
+  '👀 Observe La Communauté',
 ];
 
 const MIN_DELAY_MS = 30_000;

@@ -175,19 +175,42 @@ export function MentionTextarea({
   );
 }
 
-// Rend un texte contenant des tags <@&roleId> / <#channelId> / <a?:nom:id>
-// (emoji personnalisé) avec des pastilles/images façon Discord — utilisé
-// dans les aperçus pour montrer ce que verrait vraiment un membre (au lieu
-// du tag brut).
-export function renderMentionText(text: string, roles: RoleOption[], channels: ChannelOption[]) {
-  const parts = text.split(/(<@&\d+>|<#\d+>|<a?:\w+:\d+>)/g);
+// Rend un texte contenant des tags <@&roleId> / <@userId> / <#channelId> /
+// <a?:nom:id> (emoji personnalisé) avec des pastilles/images façon Discord —
+// utilisé dans les aperçus pour montrer ce que verrait vraiment un membre
+// (au lieu du tag brut). `previewUser` résout le mention d'utilisateur vers
+// le pseudo affiché dans l'aperçu (ex: {user} des messages arrivée/départ) ;
+// sans correspondance, on retombe sur "membre-inconnu" comme pour les rôles.
+export function renderMentionText(
+  text: string,
+  roles: RoleOption[],
+  channels: ChannelOption[],
+  previewUser?: { id: string; name: string }
+) {
+  const parts = text.split(/(<@&\d+>|<@\d+>|<#\d+>|<a?:\w+:\d+>)/g);
   return parts.map((part, i) => {
     const roleMatch = /^<@&(\d+)>$/.exec(part);
     if (roleMatch) {
       const role = roles.find((r) => r.id === roleMatch[1]);
+      // Discord colore la pastille avec la couleur propre du rôle (fond à
+      // 10% d'opacité, texte plein) quand il en a une — seuls les rôles sans
+      // couleur retombent sur le style blurple par défaut.
+      return (
+        <span
+          key={i}
+          className={`rounded px-1 font-medium ${role?.color ? '' : 'bg-[#5865F2]/30 text-[#c9cdfb]'}`}
+          style={role?.color ? { backgroundColor: `${role.color}1a`, color: role.color } : undefined}
+        >
+          @{role?.name ?? 'rôle-inconnu'}
+        </span>
+      );
+    }
+    const userMatch = /^<@(\d+)>$/.exec(part);
+    if (userMatch) {
+      const name = previewUser?.id === userMatch[1] ? previewUser.name : 'membre-inconnu';
       return (
         <span key={i} className="rounded bg-[#5865F2]/30 px-1 font-medium text-[#c9cdfb]">
-          @{role?.name ?? 'rôle-inconnu'}
+          @{name}
         </span>
       );
     }

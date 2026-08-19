@@ -10,6 +10,8 @@ config({ path: path.resolve(__dirname, '../../../.env') });
 import { prisma } from '@discord-bot-dashboard/database';
 import type { BotModuleHandler } from './client.js';
 import { welcomeModule } from './modules/welcome/index.js';
+import { memberStatsModule } from './modules/memberStats.js';
+import { serverTagModule } from './modules/serverTag.js';
 import { messageXpModule as baseMessageXpModule } from './modules/levels/messageXp.js';
 import { voiceXpModule } from './modules/levels/voiceXp.js';
 import { rewardExpiryModule } from './modules/levels/rewardExpiry.js';
@@ -54,7 +56,7 @@ const messageXpModule: BotModuleHandler = {
 };
 
 // Ajouté au fur et à mesure que chaque module est reconstruit.
-const modules: BotModuleHandler[] = [welcomeModule, messageXpModule];
+const modules: BotModuleHandler[] = [welcomeModule, messageXpModule, memberStatsModule, serverTagModule];
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {

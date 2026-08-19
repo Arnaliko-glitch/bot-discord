@@ -1,7 +1,48 @@
+import { prisma } from '@discord-bot-dashboard/database';
 import { getBotIdentity } from '@/lib/discord-bot';
+import { fetchGuildMembers } from '@/lib/discord-members';
+import { MemberActivityChart, type DailyMemberPoint } from '@/components/MemberActivityChart';
 
-export default async function GuildHomePage() {
-  const bot = await getBotIdentity();
+// La plus longue période proposée par le sélecteur du graphique (30/60/90j)
+// — on récupère toujours ce maximum, le composant découpe côté client selon
+// le choix de l'utilisateur (évite un aller-retour serveur à chaque bascule).
+const MAX_ACTIVITY_DAYS = 90;
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+// 90 derniers jours, aujourd'hui inclus (le suivi n'existant que depuis
+// l'ajout de cette fonctionnalité, les jours sans donnée valent simplement 0/0).
+function buildActivityRange(rows: { date: Date; joins: number; leaves: number }[]): DailyMemberPoint[] {
+  const byDate = new Map(rows.map((r) => [isoDate(r.date), r]));
+  const today = new Date();
+  const days: DailyMemberPoint[] = [];
+  for (let i = MAX_ACTIVITY_DAYS - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
+    const key = isoDate(d);
+    const row = byDate.get(key);
+    days.push({ date: key, joins: row?.joins ?? 0, leaves: row?.leaves ?? 0 });
+  }
+  return days;
+}
+
+export default async function GuildHomePage({ params }: { params: { guildId: string } }) {
+  const rangeStart = new Date();
+  rangeStart.setUTCDate(rangeStart.getUTCDate() - (MAX_ACTIVITY_DAYS - 1));
+  rangeStart.setUTCHours(0, 0, 0, 0);
+
+  const [bot, members, activityRows] = await Promise.all([
+    getBotIdentity(),
+    fetchGuildMembers(params.guildId),
+    prisma.dailyMemberStat.findMany({
+      where: { guildId: params.guildId, date: { gte: rangeStart } },
+      orderBy: { date: 'asc' },
+    }),
+  ]);
+
+  const memberCount = members.filter((m) => !m.user.bot).length;
+  const activity = buildActivityRange(activityRows);
 
   return (
     <div className="space-y-8">
@@ -14,7 +55,7 @@ export default async function GuildHomePage() {
         </p>
       </div>
 
-      {/* Statistiques du serveur sous forme de tuiles — prévu plus tard. */}
+      <MemberActivityChart memberCount={memberCount} data={activity} />
     </div>
   );
 }

@@ -135,7 +135,12 @@ function BannerVisual({ kind, avatarUrl, guildName }: { kind: 'welcome' | 'goodb
   const isWelcome = kind === 'welcome';
   return (
     <div className="relative flex h-full items-center gap-5 px-7">
-      <img src={avatarUrl} alt="" className="h-[112px] w-[112px] shrink-0 rounded-full" />
+      <img
+        src={avatarUrl}
+        alt=""
+        className="h-[112px] w-[112px] shrink-0 rounded-full"
+        style={{ boxShadow: '0 0 0 4px #ffffff' }}
+      />
       <div className={`min-w-0 text-white ${bannerFont.className}`}>
         <p className="text-[38px] leading-[1.05]">{isWelcome ? 'Bienvenue' : 'À bientôt'}</p>
         <p className="text-[18px] leading-tight text-white/85">sur le serveur Discord</p>
@@ -213,6 +218,12 @@ function BannerEditorModal({
   const [draftImage, setDraftImage] = useState(initial.backgroundImage);
   const [draftColor, setDraftColor] = useState(initial.backgroundColor);
   const [uploading, setUploading] = useState(false);
+  // Pré-rempli le champ URL si l'image actuelle en est déjà une (par
+  // opposition à un fichier uploadé, dont le chemin /uploads/... n'a pas sa
+  // place dans ce champ).
+  const [urlInput, setUrlInput] = useState(
+    initial.backgroundImage && /^https?:\/\//i.test(initial.backgroundImage) ? initial.backgroundImage : ''
+  );
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -247,13 +258,44 @@ function BannerEditorModal({
       // ici — seulement au moment d'Annuler ou d'Enregistrer.
       if (draftImage && draftImage !== initial.backgroundImage) deleteServerFile(draftImage);
       setDraftImage(data.url);
+      setUrlInput(''); // Le fond vient d'un fichier uploadé, pas d'une URL.
     } finally {
       setUploading(false);
     }
   }
 
+  // Alternative à l'upload : coller directement une URL d'image (pratique en
+  // local, où le serveur web n'est pas accessible depuis l'extérieur pour un
+  // fichier uploadé). L'URL est stockée telle quelle, sans passer par /upload.
+  // On garde le champ rempli avec l'URL en cours (pas de reset à vide) pour
+  // qu'il reste cohérent avec l'aperçu tant qu'on ne change pas de source.
+  function handleUseUrl() {
+    const trimmed = urlInput.trim();
+    if (!trimmed) return;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setError("L'URL doit commencer par http:// ou https://");
+      return;
+    }
+    setError('');
+    if (draftImage && draftImage !== initial.backgroundImage) deleteServerFile(draftImage);
+    setDraftImage(trimmed);
+  }
+
+  // Choisir une couleur remplace l'image en cours — un seul fond actif à la
+  // fois. L'ancienne image n'est supprimée du serveur immédiatement que si
+  // elle n'a jamais été enregistrée (upload fait dans cette session) ; sinon
+  // la suppression est différée à la sauvegarde globale (voir save() dans
+  // WelcomeConfigPage), pour que "Annuler" reste sans effet.
+  function handlePickColor(color: string) {
+    if (draftImage && draftImage !== initial.backgroundImage) deleteServerFile(draftImage);
+    setDraftImage(null);
+    setUrlInput('');
+    setDraftColor(color);
+  }
+
   function handleRemoveImage() {
     if (draftImage && draftImage !== initial.backgroundImage) deleteServerFile(draftImage);
+    setUrlInput('');
     setDraftImage(null);
   }
 
@@ -309,6 +351,27 @@ function BannerEditorModal({
             <BannerVisual kind={kind} avatarUrl={avatarUrl} guildName={guildName} />
           </div>
 
+          {tab === 'image' && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleUseUrl();
+                  }
+                }}
+                placeholder="Ou coller une URL d'image (https://...)"
+                className="input flex-1 text-sm"
+              />
+              <button type="button" onClick={handleUseUrl} className="btn-secondary shrink-0 text-sm">
+                Utiliser
+              </button>
+            </div>
+          )}
+
           {error && <p className="mt-2 text-xs text-[#ED4245]">{error}</p>}
         </div>
 
@@ -345,7 +408,7 @@ function BannerEditorModal({
               <>
                 <button
                   type="button"
-                  onClick={() => setDraftColor('none')}
+                  onClick={() => handlePickColor('none')}
                   title="Aucune"
                   className={`flex h-8 w-8 items-center justify-center rounded-full border-2 bg-[#2b2d31] transition ${
                     draftColor === 'none' ? 'border-white' : 'border-white/20'
@@ -357,7 +420,7 @@ function BannerEditorModal({
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setDraftColor(c)}
+                    onClick={() => handlePickColor(c)}
                     title={c}
                     className={`h-8 w-8 rounded-full border-2 transition ${
                       draftColor.toLowerCase() === c.toLowerCase() ? 'border-white' : 'border-white/20'
@@ -377,7 +440,7 @@ function BannerEditorModal({
                   ref={colorInputRef}
                   type="color"
                   value={draftColor === 'none' ? '#000000' : draftColor}
-                  onChange={(e) => setDraftColor(e.target.value)}
+                  onChange={(e) => handlePickColor(e.target.value)}
                   className="hidden"
                 />
               </>
@@ -413,6 +476,7 @@ function MessagePreview({
   embedFooter,
   roles,
   channels,
+  previewUsername,
   onEditBackground,
 }: {
   botName: string;
@@ -429,6 +493,7 @@ function MessagePreview({
   embedFooter: string;
   roles: RoleOption[];
   channels: Channel[];
+  previewUsername: string;
   onEditBackground: () => void;
 }) {
   return (
@@ -457,7 +522,7 @@ function MessagePreview({
           {embedTitle && <p className="text-base font-semibold text-white">{embedTitle}</p>}
           {embedDescription && (
             <p className="whitespace-pre-wrap text-sm text-[#dcddde]">
-              {renderMentionText(embedDescription, roles, channels)}
+              {renderMentionText(embedDescription, roles, channels, { id: '0', name: previewUsername })}
             </p>
           )}
           <BannerPreview
@@ -665,9 +730,14 @@ export function WelcomeConfigPage({
     setEditingBannerKind(null);
   }
 
-  function previewText(template: string, mention: boolean) {
+  // `asTag` produit le vrai tag de mention (<@0>, résolu en pastille bleue
+  // par renderMentionText) — utilisé uniquement pour la description, seul
+  // champ où Discord résout réellement les mentions (titre/pied de page
+  // restent du texte brut côté bot, donc pareil ici).
+  function previewText(template: string, mention: boolean, asTag = false) {
+    const userText = mention ? (asTag ? '<@0>' : `@${previewUsername}`) : previewUsername;
     return template
-      .replaceAll('{user}', mention ? `@${previewUsername}` : previewUsername)
+      .replaceAll('{user}', userText)
       .replaceAll('{server}', guildName)
       .replaceAll('{server.membercount}', '128');
   }
@@ -762,7 +832,9 @@ export function WelcomeConfigPage({
 
           <label className="flex cursor-pointer items-center gap-3">
             <Toggle checked={config.mentionUser} onChange={(v) => update('mentionUser', v)} />
-            <span className="text-sm text-gray-400">Mentionner le membre dans le message de bienvenue.</span>
+            <span className="text-sm text-gray-400">
+              Notifier le membre (ping séparé) — {'{user}'} s&apos;affiche de toute façon comme une mention.
+            </span>
           </label>
         </div>
 
@@ -785,10 +857,11 @@ export function WelcomeConfigPage({
             }}
             embedColor={config.sidebarColor}
             embedTitle={previewText(config.embedTitle ?? '', false)}
-            embedDescription={previewText(config.message, false)}
+            embedDescription={previewText(config.message, true, true)}
             embedFooter={previewText(config.embedFooter ?? '', false)}
             roles={roles}
             channels={channels}
+            previewUsername={previewUsername}
             onEditBackground={() => setEditingBannerKind('welcome')}
           />
         </div>
@@ -874,6 +947,10 @@ export function WelcomeConfigPage({
               placeholder="Facultatif"
               className="input"
             />
+            <p className="mt-1.5 text-xs text-gray-500">
+              L&apos;ancienneté du membre (« Avait rejoint le serveur il y a... ») est ajoutée automatiquement devant,
+              comme dans l&apos;aperçu ci-contre.
+            </p>
           </div>
         </div>
 
@@ -885,7 +962,7 @@ export function WelcomeConfigPage({
             botName={botName}
             botAvatarUrl={botAvatarUrl}
             now={now}
-            mentionLine={config.goodbyeMentionUser ? `@${previewUsername}` : null}
+            mentionLine={null}
             kind="goodbye"
             avatarUrl={previewAvatarUrl}
             guildName={guildName}
@@ -896,14 +973,37 @@ export function WelcomeConfigPage({
             }}
             embedColor={config.goodbyeSidebarColor}
             embedTitle={previewText(config.goodbyeEmbedTitle ?? '', false)}
-            embedDescription={previewText(config.goodbyeMessage, false)}
-            embedFooter={previewText(config.goodbyeEmbedFooter ?? '', false)}
+            embedDescription={previewText(config.goodbyeMessage, true, true)}
+            embedFooter={['Avait rejoint le serveur il y a 3 mois', previewText(config.goodbyeEmbedFooter ?? '', false)]
+              .filter(Boolean)
+              .join(' • ')}
             roles={roles}
             channels={channels}
+            previewUsername={previewUsername}
             onEditBackground={() => setEditingBannerKind('goodbye')}
           />
         </div>
       </section>
+
+      <div className="card space-y-2">
+        <h2 className="text-sm font-semibold text-white">Variables disponibles</h2>
+        <p className="text-xs text-gray-500">
+          Utilisables dans le message, le titre et le pied de page (arrivée comme départ).
+        </p>
+        <ul className="space-y-1.5 text-xs text-gray-400">
+          <li>
+            <code className="rounded bg-white/10 px-1.5 py-0.5 text-gray-200">{'{user}'}</code> — mentionne le membre
+            (n&apos;envoie pas de notification à lui seul — l&apos;option « Notifier le membre » sert à ça, séparément)
+          </li>
+          <li>
+            <code className="rounded bg-white/10 px-1.5 py-0.5 text-gray-200">{'{server}'}</code> — nom du serveur
+          </li>
+          <li>
+            <code className="rounded bg-white/10 px-1.5 py-0.5 text-gray-200">{'{server.membercount}'}</code> — nombre
+            de membres du serveur
+          </li>
+        </ul>
+      </div>
 
       {editingBannerKind && (
         <BannerEditorModal

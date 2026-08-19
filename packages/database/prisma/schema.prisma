@@ -26,6 +26,7 @@ model Guild {
   TemporaryRoleGrant  TemporaryRoleGrant[]
   LogEntry            LogEntry[]
   SavedMessage        SavedMessage[]
+  ServerTagConfig     ServerTagConfig?
   Ticket              Ticket[]
   TicketConfig        TicketConfig?
   TicketRequest       TicketRequest[]
@@ -283,4 +284,34 @@ model XpSettings {
   voiceXpMax             Int      @default(15)
   voiceXpMin             Int      @default(5)
   Guild                  Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+// Compteur journalier d'arrivées/départs — agrégé au jour plutôt qu'un
+// évènement par membre, pour rester léger même après des mois d'historique.
+// Alimenté par le bot (guildMemberAdd/Remove), lu par la page d'accueil du
+// dashboard pour le graphique de variation nette des membres.
+model DailyMemberStat {
+  id        String   @id
+  guildId   String
+  date      DateTime
+  joins     Int      @default(0)
+  leaves    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, date])
+  @@index([guildId, date])
+}
+
+// Rôle attribué automatiquement à un membre tant qu'il affiche le tag de ce
+// serveur sur son profil Discord (fonctionnalité "identité de serveur"),
+// retiré dès qu'il le retire.
+model ServerTagConfig {
+  id        String   @id
+  guildId   String   @unique
+  enabled   Boolean  @default(false)
+  roleId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }

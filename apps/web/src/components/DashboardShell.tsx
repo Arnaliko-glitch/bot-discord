@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ArrowLeftRight, DoorOpen, Home, MessageSquare, ScrollText, Ticket, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, DoorOpen, Home, MessageSquare, ScrollText, Tag, Ticket, TrendingUp } from 'lucide-react';
 import { UnsavedChangesProvider, useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
 // Réduit aux modules déjà (ou bientôt) reconstruits — les autres reviendront
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { slug: 'levels', label: 'Niveaux', icon: TrendingUp },
   { slug: 'messages', label: 'Message', icon: MessageSquare },
   { slug: 'tickets', label: 'Tickets', icon: Ticket },
+  { slug: 'server-tag', label: 'Tag du serveur', icon: Tag },
   { slug: 'logs', label: 'Logs', icon: ScrollText },
 ] as const;
 
@@ -93,15 +94,15 @@ function DashboardShellContent({
           </Link>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 px-4 pb-4">
+        <div className="mt-2 flex flex-col items-center gap-2 px-4 pb-4 text-center">
           {iconUrl ? (
-            <img src={iconUrl} alt="" className="h-10 w-10 rounded-full" />
+            <img src={iconUrl} alt="" className="h-16 w-16 rounded-full" />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-white">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent)] text-xl font-bold text-white">
               {guildName.slice(0, 1).toUpperCase()}
             </div>
           )}
-          <span className="truncate font-semibold text-white">{guildName}</span>
+          <span className="line-clamp-2 text-base font-bold leading-tight text-white">{guildName}</span>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2">
