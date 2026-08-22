@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Poppins } from 'next/font/google';
 import { ArrowLeftRight, ChevronDown } from 'lucide-react';
 import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
 import { EmojiPickerButton } from '@/components/EmojiPickerButton';
@@ -14,6 +15,11 @@ import { XpCurveChart } from '@/components/XpCurveChart';
 // Couleur fixe de l'embed de niveau — contrairement au module Bienvenue, ce
 // visuel n'est pas personnalisable (voir MessagePreview ci-dessous).
 const LEVEL_EMBED_COLOR = '#F0A020';
+
+// Même police (Poppins ExtraBold) que les cartes de niveau/récompense
+// générées côté bot (packages/bot/src/utils/celebrationCard.ts, rankCard.ts)
+// — pour que l'aperçu corresponde à l'image réellement envoyée sur Discord.
+const cardFont = Poppins({ subsets: ['latin'], weight: '800' });
 
 // Miroir des colonnes réelles de XpSettings en base (voir schema.prisma).
 interface LevelsConfigData {
@@ -174,6 +180,163 @@ function EditModal({
   );
 }
 
+interface DraftBotPreview {
+  guildName: string | null;
+  totalFound: number;
+  minLevel: number;
+  maxLevel: number;
+  alreadyExisting: number;
+  stillHere: number;
+}
+
+// Modale en 3 étapes (lien -> aperçu -> résultat) pour récupérer les niveaux
+// d'un serveur qui utilisait déjà DraftBot — l'aperçu ne fait qu'analyser
+// (aucune écriture en base) tant que l'import n'est pas confirmé.
+function ImportDraftBotModal({ guildId, onClose }: { guildId: string; onClose: () => void }) {
+  const [step, setStep] = useState<'input' | 'preview' | 'done'>('input');
+  const [urlInput, setUrlInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState<DraftBotPreview | null>(null);
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
+  const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
+
+  async function analyze() {
+    setLoading(true);
+    setError('');
+    const res = await fetch(`/api/guilds/${guildId}/levels/import-draftbot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draftbotServerId: urlInput, dryRun: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "Échec de l'analyse.");
+      return;
+    }
+    setPreview(data);
+    setStep('preview');
+  }
+
+  async function confirmImport() {
+    setLoading(true);
+    setError('');
+    const res = await fetch(`/api/guilds/${guildId}/levels/import-draftbot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draftbotServerId: urlInput, dryRun: false, overwriteExisting }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "Échec de l'import.");
+      return;
+    }
+    setResult(data);
+    setStep('done');
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-xl border border-white/10 bg-[#1a1d23] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-4 font-semibold text-white">Importer depuis DraftBot</h3>
+
+        {step === 'input' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-400">
+              Collez le lien (ou l&apos;ID) de la page de classement DraftBot du serveur — les niveaux des membres
+              seront importés en conservant leur niveau actuel, converti selon votre courbe d&apos;expérience.
+            </p>
+            <input
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && urlInput.trim()) analyze();
+              }}
+              placeholder="https://www.draftbot.fr/levels/..."
+              className="input"
+            />
+            {error && <p className="text-xs text-[#ED4245]">{error}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={onClose} className="text-sm text-gray-400 hover:text-gray-200">
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={analyze}
+                disabled={loading || !urlInput.trim()}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                {loading ? 'Analyse...' : 'Analyser'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'preview' && preview && (
+          <div className="space-y-4">
+            <div className="space-y-1.5 text-sm text-gray-300">
+              <p>
+                <strong className="text-white">{preview.totalFound}</strong> membres trouvés
+                {preview.guildName ? ` sur « ${preview.guildName} »` : ''}, niveaux {preview.minLevel} à{' '}
+                {preview.maxLevel}.
+              </p>
+              <p>
+                <strong className="text-white">{preview.stillHere}</strong> sont déjà membres de ce serveur — leur
+                avatar sera rempli tout de suite, les autres resteront sans photo jusqu&apos;à leur arrivée ou leur
+                premier message.
+              </p>
+              {preview.alreadyExisting > 0 && (
+                <p className="text-[#F0A020]">
+                  {preview.alreadyExisting} ont déjà une progression enregistrée ici.
+                </p>
+              )}
+            </div>
+            {preview.alreadyExisting > 0 && (
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle checked={overwriteExisting} onChange={setOverwriteExisting} />
+                <span className="text-sm text-gray-400">Écraser leur progression existante avec celle de DraftBot.</span>
+              </label>
+            )}
+            {error && <p className="text-xs text-[#ED4245]">{error}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setStep('input')} className="text-sm text-gray-400 hover:text-gray-200">
+                Retour
+              </button>
+              <button
+                type="button"
+                onClick={confirmImport}
+                disabled={loading}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                {loading ? 'Import...' : "Confirmer l'import"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'done' && result && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              ✅ <strong className="text-white">{result.imported}</strong> membres importés
+              {result.skipped > 0 && `, ${result.skipped} ignorés (déjà existants)`}.
+            </p>
+            <div className="flex justify-end">
+              <button type="button" onClick={onClose} className="btn-primary text-sm">
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Bulle Discord + embed façon "level up" — le visuel (couleur, avatar en
 // médaillon, titre "Félicitations !") est fixe, seul le texte brut
 // au-dessus (levelUpMessage) est personnalisable.
@@ -238,7 +401,7 @@ function MessagePreview({
             className="h-14 w-14 shrink-0 rounded-full ring-2"
             style={{ boxShadow: `0 0 0 2px ${LEVEL_EMBED_COLOR}` }}
           />
-          <div className="min-w-0">
+          <div className={`min-w-0 ${cardFont.className}`}>
             <p className="text-lg font-bold text-white">Félicitations !</p>
             <p className="text-sm text-[#dcddde]">vous avez atteint</p>
             <p className="text-sm font-bold" style={{ color: LEVEL_EMBED_COLOR }}>
@@ -318,7 +481,7 @@ function RewardMessagePreview({
               className="h-14 w-14 shrink-0 rounded-full"
               style={{ boxShadow: `0 0 0 2px ${REWARD_EMBED_COLOR}` }}
             />
-            <div className="min-w-0">
+            <div className={`min-w-0 ${cardFont.className}`}>
               <p className="text-lg font-bold text-white">Félicitations !</p>
               <p className="text-sm text-[#dcddde]">vous recevez le rôle</p>
               <p className="truncate text-sm font-bold" style={{ color: REWARD_EMBED_COLOR }}>
@@ -560,7 +723,7 @@ export function LevelsConfigPage({
   const [lastSaved, setLastSaved] = useState(() => JSON.stringify(initial ?? DEFAULT_CONFIG));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [editingModal, setEditingModal] = useState<'xp' | 'voice' | 'curve' | null>(null);
+  const [editingModal, setEditingModal] = useState<'xp' | 'voice' | 'curve' | 'import-draftbot' | null>(null);
   const [rewards, setRewards] = useState<LevelRoleReward[]>(initialRewards);
   const [rewardModal, setRewardModal] = useState<'new' | LevelRoleReward | null>(null);
   const [rewardError, setRewardError] = useState('');
@@ -1181,6 +1344,19 @@ export function LevelsConfigPage({
         </div>
       </section>
 
+      <section className="space-y-4 border-t border-[var(--border)] pt-8">
+        <div>
+          <h2 className="font-semibold text-white">Importer des niveaux existants</h2>
+          <p className="text-sm text-gray-500">
+            Si ce serveur utilisait déjà DraftBot pour les niveaux, récupérez la progression de ses membres pour repartir
+            de là où elle s&apos;est arrêtée.
+          </p>
+        </div>
+        <button type="button" onClick={() => setEditingModal('import-draftbot')} className="btn-secondary text-sm">
+          Importer depuis DraftBot
+        </button>
+      </section>
+
       {rewardModal && (
         <RewardModal
           roles={roles}
@@ -1251,7 +1427,11 @@ export function LevelsConfigPage({
         </EditModal>
       )}
 
-      <div className="fixed bottom-0 left-64 right-0 flex items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8 py-4">
+      {editingModal === 'import-draftbot' && (
+        <ImportDraftBotModal guildId={guildId} onClose={() => setEditingModal(null)} />
+      )}
+
+      <div className="fixed bottom-0 left-64 right-0 flex h-[72px] items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8">
         {message && <p className="text-sm">{message}</p>}
         <button
           type="button"

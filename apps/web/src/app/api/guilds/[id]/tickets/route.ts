@@ -20,8 +20,6 @@ const DEFAULTS = {
   moderatorRoleIds: [] as string[],
   noReasonMessage: "N'hésitez pas à décrire votre problème, un membre du staff vous prendra rapidement en charge.",
   validationEnabled: true,
-  openPrivateThread: false,
-  autoSaveTranscript: false,
   openingMessage: 'Bonjour {user}, décrivez votre problème et un membre du staff vous répondra sous peu.',
 };
 
@@ -65,8 +63,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     moderatorRoleIds: toStringArray(body.moderatorRoleIds),
     noReasonMessage: String(body.noReasonMessage ?? '').slice(0, 4000),
     validationEnabled: !!body.validationEnabled,
-    openPrivateThread: !!body.openPrivateThread,
-    autoSaveTranscript: !!body.autoSaveTranscript,
     openingMessage: String(body.openingMessage ?? '').slice(0, 4000),
   };
 

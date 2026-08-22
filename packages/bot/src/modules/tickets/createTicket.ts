@@ -91,15 +91,5 @@ export async function createTicketChannel(
   const pinNotice = await channel.messages.fetch({ limit: 1 }).then((msgs) => msgs.first()).catch(() => null);
   if (pinNotice?.type === MessageType.ChannelPinnedMessage) await pinNotice.delete().catch(() => undefined);
 
-  if (config.openPrivateThread) {
-    await channel.threads
-      .create({
-        name: 'discussion-staff',
-        type: ChannelType.PrivateThread,
-        invitable: false,
-      })
-      .catch((err) => console.error('Création du fil privé de ticket échouée:', err));
-  }
-
   return channel;
 }

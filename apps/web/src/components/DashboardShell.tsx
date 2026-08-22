@@ -84,7 +84,7 @@ function DashboardShellContent({
 
   return (
     <div className="min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--card)] py-4">
+      <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--card)] pt-4">
         <div className="flex items-center justify-between px-4">
           <span
             className={`h-2.5 w-2.5 rounded-full ${botOnline ? 'bg-[#57F287]' : 'bg-gray-600'}`}
@@ -132,7 +132,7 @@ function DashboardShellContent({
           })}
         </nav>
 
-        <div className="flex items-center gap-3 border-t border-[var(--border)] px-4 pt-4">
+        <div className="flex h-[72px] shrink-0 items-center gap-3 border-t border-[var(--border)] px-4">
           <img src={userAvatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-white">{username}</p>

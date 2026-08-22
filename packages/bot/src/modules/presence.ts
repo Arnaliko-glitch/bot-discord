@@ -7,7 +7,6 @@ const PHRASES = [
   '👋 Accueille Les Membres',
   '💫 Toujours Là',
   '🎫 Gère Les Tickets',
-  '🔔 Service Disponible',
   '👀 Observe La Communauté',
 ];
 

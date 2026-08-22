@@ -4,8 +4,6 @@ import { userAvatarUrl } from '@/lib/auth';
 import { fetchGuildMembers, resolveDisplayName } from '@/lib/discord-members';
 import { PublicLeaderboardPage } from '@/components/PublicLeaderboardPage';
 
-const LEADERBOARD_SIZE = 100;
-
 interface DiscordRole {
   id: string;
   name: string;
@@ -68,9 +66,12 @@ export default async function LeaderboardPage({ params }: { params: { guildId: s
       level: 0,
     }));
 
+  // Pas de troncature ici : la liste complète (plafonnée par fetchGuildMembers
+  // à 1000 membres, la limite d'une page de l'API Discord) part côté client,
+  // qui n'en affiche qu'une partie à la fois via "Charger plus" — un simple
+  // dépliage sans aller-retour réseau supplémentaire.
   const entries = [...fromXp, ...fillMembers]
     .sort((a, b) => b.xp - a.xp)
-    .slice(0, LEADERBOARD_SIZE)
     .map((entry, i) => ({ rank: i + 1, ...entry }));
 
   const rewardList = rewards.map((reward) => {

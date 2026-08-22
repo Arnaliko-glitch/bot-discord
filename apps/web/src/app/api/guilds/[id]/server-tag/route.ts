@@ -7,6 +7,8 @@ type Params = { params: { id: string } };
 const DEFAULTS = {
   enabled: false,
   roleId: null as string | null,
+  announceChannelId: null as string | null,
+  announceMessage: '{user}, voici votre récompense pour avoir mis le tag du serveur ! 🏷️',
 };
 
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -33,6 +35,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const data = {
     enabled: !!body.enabled,
     roleId: body.roleId || null,
+    announceChannelId: body.announceChannelId || null,
+    announceMessage: String(body.announceMessage ?? '').slice(0, 1000),
   };
 
   const updated = await prisma.serverTagConfig.upsert({

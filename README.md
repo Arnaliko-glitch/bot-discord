@@ -7,6 +7,15 @@ Monorepo pnpm : tableau de bord web (Next.js) + bot Discord (discord.js), config
 - `packages/database` — schéma Prisma + client partagé
 - `packages/shared` — types partagés
 
+## Fonctionnalités
+
+- **Arrivées et départs** — message et bannière générée dynamiquement (avatar cerclé, fond en image uploadée ou URL, ou couleur), variables `{user}` / `{server}` / `{server.membercount}`, mention du membre découplée du simple affichage.
+- **Niveaux** — XP par message et en vocal (courbe et cooldown configurables), classement (`/niveau`, `/classement`, page publique `/leaderboard/[guildId]`), récompenses de rôle par palier (permanentes ou temporaires).
+- **Messages** — composeur de messages interactifs : embeds multiples, galerie d'images, boutons (ouvrir un ticket ou rediriger vers un lien), aperçu fidèle au rendu Discord, brouillons.
+- **Tickets** — création via bouton ou `/panel-ticket`, validation/refus, fermeture et réouverture avec motif.
+- **Tag du serveur** — attribue automatiquement un rôle aux membres qui affichent le tag ("identité de serveur") de ce serveur sur leur profil Discord.
+- **Accueil** — nombre de membres et graphique de variation nette (arrivées/départs) sur 30/60/90 jours, résumé `/statistiques` en salon.
+
 ## Développement local
 
 Prérequis : Node.js 20+, pnpm 9, un Postgres accessible localement.

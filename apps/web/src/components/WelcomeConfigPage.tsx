@@ -1029,7 +1029,7 @@ export function WelcomeConfigPage({
         />
       )}
 
-      <div className="fixed bottom-0 left-64 right-0 flex items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8 py-4">
+      <div className="fixed bottom-0 left-64 right-0 flex h-[72px] items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8">
         {message && <p className="text-sm">{message}</p>}
         <button
           type="button"

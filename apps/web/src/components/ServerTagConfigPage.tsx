@@ -2,14 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Poppins } from 'next/font/google';
+import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
+import { EmojiPickerButton } from '@/components/EmojiPickerButton';
+import { MentionTextarea, renderMentionText, type RoleOption } from '@/components/MentionTextarea';
+import type { GuildEmoji } from '@/lib/emoji-data';
 import { useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
 export interface ServerTagConfigData {
   enabled: boolean;
   roleId: string | null;
+  announceChannelId: string | null;
+  announceMessage: string;
 }
 
-const DEFAULT_CONFIG: ServerTagConfigData = { enabled: false, roleId: null };
+const DEFAULT_CONFIG: ServerTagConfigData = {
+  enabled: false,
+  roleId: null,
+  announceChannelId: null,
+  announceMessage: '{user}, voici votre récompense pour avoir mis le tag du serveur ! 🏷️',
+};
+
+const ACCENT_COLOR = '#ED4245';
+
+// Même police que les cartes de récompense générées côté bot
+// (packages/bot/src/utils/celebrationCard.ts) — pour que l'aperçu
+// corresponde à l'image réellement envoyée sur Discord.
+const cardFont = Poppins({ subsets: ['latin'], weight: '800' });
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -25,28 +44,131 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
+// Bulle Discord + carte "Félicitations !" façon récompense de niveau — même
+// principe que RewardMessagePreview dans LevelsConfigPage.tsx, mais sans
+// notion de niveau ici (juste le rôle obtenu en affichant le tag).
+function AnnounceMessagePreview({
+  botName,
+  botAvatarUrl,
+  now,
+  avatarUrl,
+  announceMessage,
+  previewUsername,
+  roleName,
+  roles,
+  channels,
+}: {
+  botName: string;
+  botAvatarUrl: string | null;
+  now: string;
+  avatarUrl: string;
+  announceMessage: string;
+  previewUsername: string;
+  roleName: string;
+  roles: RoleOption[];
+  channels: Channel[];
+}) {
+  const contentParts = announceMessage.split('{user}');
+
+  return (
+    <div className="card space-y-2 p-4">
+      <div className="flex items-center gap-2">
+        {botAvatarUrl ? (
+          <img src={botAvatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full" />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">
+            {botName.slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-white">{botName}</span>
+          <span className="rounded bg-[var(--accent)] px-1 py-0.5 text-[9px] font-medium text-white">APP</span>
+          <span className="text-xs text-gray-500">{now}</span>
+        </div>
+      </div>
+
+      <p className="whitespace-pre-wrap text-sm text-[#dcddde]">
+        {contentParts.map((part, i) => (
+          <span key={i}>
+            {renderMentionText(part, roles, channels)}
+            {i < contentParts.length - 1 && <span className="text-[#00a8fc]">@{previewUsername}</span>}
+          </span>
+        ))}
+      </p>
+
+      <div className="flex overflow-hidden rounded">
+        <div className="w-1 shrink-0" style={{ backgroundColor: ACCENT_COLOR }} />
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#2b2d31] p-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-14 w-14 shrink-0 rounded-full"
+              style={{ boxShadow: `0 0 0 2px ${ACCENT_COLOR}` }}
+            />
+            <div className={`min-w-0 ${cardFont.className}`}>
+              <p className="text-lg font-bold text-white">Félicitations !</p>
+              <p className="text-sm text-[#dcddde]">vous recevez le rôle</p>
+              <p className="truncate text-sm font-bold" style={{ color: ACCENT_COLOR }}>
+                {roleName}
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-2xl">🎉</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Donne automatiquement un rôle aux membres qui affichent le tag de ce
 // serveur sur leur profil Discord, et le retire dès qu'ils le retirent —
-// suivi en direct côté bot, rien à faire ici hormis choisir le rôle.
+// suivi en direct côté bot, rien à faire ici hormis choisir le rôle et,
+// en option, annoncer publiquement l'obtention du rôle.
 export function ServerTagConfigPage({
   guildId,
+  guildName,
+  guildIconUrl,
+  previewAvatarUrl,
+  previewUsername,
+  botName,
+  botAvatarUrl,
   initial,
 }: {
   guildId: string;
+  guildName: string;
+  guildIconUrl: string | null;
+  previewAvatarUrl: string;
+  previewUsername: string;
+  botName: string;
+  botAvatarUrl: string | null;
   initial?: ServerTagConfigData;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<ServerTagConfigData>(initial ?? DEFAULT_CONFIG);
   const [lastSaved, setLastSaved] = useState(() => JSON.stringify(initial ?? DEFAULT_CONFIG));
-  const [roles, setRoles] = useState<{ id: string; name: string; color: string | null }[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channelsLoading, setChannelsLoading] = useState(true);
+  const [guildEmojis, setGuildEmojis] = useState<GuildEmoji[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
     fetch(`/api/guilds/${guildId}/roles`)
       .then((res) => (res.ok ? res.json() : []))
       .then(setRoles)
       .catch(() => setRoles([]));
+    fetch(`/api/guilds/${guildId}/channels`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setChannels)
+      .catch(() => setChannels([]))
+      .finally(() => setChannelsLoading(false));
+    fetch(`/api/guilds/${guildId}/emojis`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setGuildEmojis)
+      .catch(() => setGuildEmojis([]));
   }, [guildId]);
 
   const isDirty = JSON.stringify(config) !== lastSaved;
@@ -122,7 +244,81 @@ export function ServerTagConfigPage({
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-64 right-0 flex items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8 py-4">
+      <section className="space-y-4 border-t border-[var(--border)] pt-8">
+        <div>
+          <h2 className="font-semibold text-white">Annonce du rôle obtenu</h2>
+          <p className="text-sm text-gray-500">
+            Annonce publiquement l&apos;obtention du rôle quand un membre affiche le tag du serveur.
+          </p>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Salon d&apos;annonce
+              </span>
+              <ChannelSelect
+                label=""
+                channels={channels}
+                value={config.announceChannelId ?? ''}
+                onChange={(v) => update('announceChannelId', v || null)}
+                loading={channelsLoading}
+              />
+              <p className="mt-1 text-xs text-gray-500">Laissez vide pour désactiver l&apos;annonce.</p>
+            </div>
+
+            {config.announceChannelId && (
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Message personnalisé
+                </span>
+                <div className="relative">
+                  <MentionTextarea
+                    value={config.announceMessage}
+                    onChange={(v) => update('announceMessage', v)}
+                    roles={roles}
+                    channels={channels}
+                    rows={4}
+                    maxLength={1000}
+                    className="input resize-none pr-9"
+                  />
+                  <div className="absolute right-2 top-2">
+                    <EmojiPickerButton
+                      guildName={guildName}
+                      guildIconUrl={guildIconUrl}
+                      guildEmojis={guildEmojis}
+                      onPick={(e) => update('announceMessage', (config.announceMessage + e).slice(0, 1000))}
+                    />
+                  </div>
+                </div>
+                <p className="mt-1 text-right text-xs text-gray-500">{config.announceMessage.length} /1000</p>
+              </div>
+            )}
+          </div>
+
+          {config.announceChannelId && (
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Prévisualisation
+              </span>
+              <AnnounceMessagePreview
+                botName={botName}
+                botAvatarUrl={botAvatarUrl}
+                now={now}
+                avatarUrl={previewAvatarUrl}
+                announceMessage={config.announceMessage}
+                previewUsername={previewUsername}
+                roleName={roles.find((r) => r.id === config.roleId)?.name ?? 'Nom du rôle'}
+                roles={roles}
+                channels={channels}
+              />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="fixed bottom-0 left-64 right-0 flex h-[72px] items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8">
         {message && <p className="text-sm">{message}</p>}
         <button
           type="button"

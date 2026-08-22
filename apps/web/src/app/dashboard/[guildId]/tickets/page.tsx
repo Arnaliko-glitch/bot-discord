@@ -29,8 +29,6 @@ export default async function TicketsPage({ params }: { params: { guildId: strin
               askOpenReason: config.askOpenReason,
               askCloseReason: config.askCloseReason,
               ticketNameFormat: config.ticketNameFormat,
-              openPrivateThread: config.openPrivateThread,
-              autoSaveTranscript: config.autoSaveTranscript,
               accessRoleIds: config.accessRoleIds,
               moderatorRoleIds: config.moderatorRoleIds,
               mentionModerators: config.mentionModerators,

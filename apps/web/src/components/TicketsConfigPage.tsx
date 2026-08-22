@@ -20,8 +20,6 @@ interface TicketsConfigData {
   askOpenReason: boolean;
   askCloseReason: boolean;
   ticketNameFormat: string;
-  openPrivateThread: boolean;
-  autoSaveTranscript: boolean;
   accessRoleIds: string[];
   moderatorRoleIds: string[];
   mentionModerators: boolean;
@@ -41,8 +39,6 @@ const DEFAULT_CONFIG: TicketsConfigData = {
   askOpenReason: true,
   askCloseReason: true,
   ticketNameFormat: '{user.globalname}',
-  openPrivateThread: false,
-  autoSaveTranscript: false,
   accessRoleIds: [],
   moderatorRoleIds: [],
   mentionModerators: true,
@@ -344,23 +340,6 @@ export function TicketsConfigPage({
             />
           </div>
 
-          <div>
-            <FieldLabel>Ouvrir un fil privé pour chaque ticket</FieldLabel>
-            <ToggleField
-              checked={config.openPrivateThread}
-              onChange={(v) => update('openPrivateThread', v)}
-              description="Afin de permettre aux administrateurs et modérateurs de tickets de parler sans le membre concerné, voulez-vous qu'un fil privé soit ouvert automatiquement dans le ticket ?"
-            />
-          </div>
-
-          <div>
-            <FieldLabel>Sauvegarde de la conversation automatique</FieldLabel>
-            <ToggleField
-              checked={config.autoSaveTranscript}
-              onChange={(v) => update('autoSaveTranscript', v)}
-              description="Voulez-vous que le contenu du ticket soit automatiquement sauvegardé lors de sa fermeture ?"
-            />
-          </div>
         </div>
 
         <div className="space-y-5">
@@ -481,7 +460,7 @@ export function TicketsConfigPage({
         </EditModal>
       )}
 
-      <div className="fixed bottom-0 left-64 right-0 flex items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8 py-4">
+      <div className="fixed bottom-0 left-64 right-0 flex h-[72px] items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--card)] px-8">
         {message && <p className="text-sm">{message}</p>}
         <button
           type="button"

@@ -14,25 +14,24 @@ datasource db {
 }
 
 model Guild {
-  id                  String                @id
-  name                String
-  icon                String?
-  ownerId             String
-  joinedAt            DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  DashboardPermission DashboardPermission[]
-  GuildSettings       GuildSettings?
-  LevelRole           LevelRole[]
-  TemporaryRoleGrant  TemporaryRoleGrant[]
-  LogEntry            LogEntry[]
-  SavedMessage        SavedMessage[]
-  ServerTagConfig     ServerTagConfig?
-  Ticket              Ticket[]
-  TicketConfig        TicketConfig?
-  TicketRequest       TicketRequest[]
-  UserXp              UserXp[]
-  welcomeConfig       WelcomeConfig?
-  XpSettings          XpSettings?
+  id                 String               @id
+  name               String
+  icon               String?
+  ownerId            String
+  joinedAt           DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  LevelRole          LevelRole[]
+  TemporaryRoleGrant TemporaryRoleGrant[]
+  LogEntry           LogEntry[]
+  LogsConfig         LogsConfig?
+  SavedMessage       SavedMessage[]
+  ServerTagConfig    ServerTagConfig?
+  Ticket             Ticket[]
+  TicketConfig       TicketConfig?
+  TicketRequest      TicketRequest[]
+  UserXp             UserXp[]
+  welcomeConfig      WelcomeConfig?
+  XpSettings         XpSettings?
 }
 
 model WelcomeConfig {
@@ -65,33 +64,6 @@ model WelcomeConfig {
   goodbyeBackgroundOverlay Boolean  @default(true)
   moduleEnabled            Boolean  @default(false)
   guild                    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
-}
-
-model DashboardPermission {
-  id        String   @id
-  guildId   String
-  addedBy   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  name      String
-  targetId  String
-  type      String   @default("member")
-  username  String?
-  avatar    String?
-  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
-
-  @@unique([guildId, targetId])
-}
-
-model GuildSettings {
-  id              String   @id
-  guildId         String   @unique
-  logChannelId    String?
-  modLogChannelId String?
-  locale          String   @default("fr")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-  Guild           Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
 model LevelRole {
@@ -203,8 +175,6 @@ model TicketConfig {
   moderatorRoleIds    String[] @default([])
   noReasonMessage     String   @default("N'hésitez pas à décrire votre problème, un membre du staff vous prendra rapidement en charge.")
   validationEnabled   Boolean  @default(true)
-  openPrivateThread   Boolean  @default(false)
-  autoSaveTranscript  Boolean  @default(false)
   // Message posté par le bot à l'ouverture du salon de ticket — version
   // texte simple en attendant le composeur de messages (avec boutons/embed).
   openingMessage      String   @default("Bonjour {user}, décrivez votre problème et un membre du staff vous répondra sous peu.")
@@ -307,13 +277,29 @@ model DailyMemberStat {
 // serveur sur son profil Discord (fonctionnalité "identité de serveur"),
 // retiré dès qu'il le retire.
 model ServerTagConfig {
-  id        String   @id
-  guildId   String   @unique
-  enabled   Boolean  @default(false)
-  roleId    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  id                String   @id
+  guildId           String   @unique
+  enabled           Boolean  @default(false)
+  roleId            String?
+  announceChannelId String?
+  announceMessage   String   @default("{user}, voici votre récompense pour avoir mis le tag du serveur ! 🏷️")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  Guild             Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+// Salons de logs par catégorie d'événement — une seule catégorie pour
+// l'instant (tag du serveur), les colonnes suivantes seront ajoutées au fur
+// et à mesure des autres catégories (modération, tickets...).
+model LogsConfig {
+  id            String   @id
+  guildId       String   @unique
+  tagChannelId  String?
+  tagLogAdded   Boolean  @default(true)
+  tagLogRemoved Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  Guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
 // Ligne unique mise à jour périodiquement par le process du bot (voir
