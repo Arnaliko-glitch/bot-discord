@@ -13,7 +13,7 @@ const DEFAULTS = {
   accessRoleIds: [] as string[],
   askCloseReason: true,
   askOpenReason: true,
-  autoDeleteOnClose: true,
+  autoDeleteOnClose: false,
   confirmationMessage: 'Votre ticket a bien été envoyé, un membre du staff vous prendra rapidement en charge si votre ticket est accepté !',
   logChannelId: null as string | null,
   mentionModerators: true,

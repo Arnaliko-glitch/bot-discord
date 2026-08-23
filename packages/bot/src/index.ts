@@ -107,7 +107,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         .upsert({
           where: { id: guild.id },
           update: { name: guild.name, icon: guild.icon },
-          create: { id: guild.id, name: guild.name, icon: guild.icon, ownerId: guild.ownerId },
+          create: { id: guild.id, name: guild.name, icon: guild.icon },
         })
         .catch((err) => console.error(`Échec de la synchro de la guilde ${guild.id}:`, err))
     )
@@ -133,7 +133,7 @@ client.on(Events.GuildCreate, (guild) => {
     .upsert({
       where: { id: guild.id },
       update: { name: guild.name, icon: guild.icon },
-      create: { id: guild.id, name: guild.name, icon: guild.icon, ownerId: guild.ownerId },
+      create: { id: guild.id, name: guild.name, icon: guild.icon },
     })
     .catch((err) => console.error(`Échec de la synchro de la guilde ${guild.id}:`, err));
 });

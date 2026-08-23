@@ -17,12 +17,9 @@ model Guild {
   id                 String               @id
   name               String
   icon               String?
-  ownerId            String
-  joinedAt           DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   LevelRole          LevelRole[]
   TemporaryRoleGrant TemporaryRoleGrant[]
-  LogEntry           LogEntry[]
   LogsConfig         LogsConfig?
   SavedMessage       SavedMessage[]
   ServerTagConfig    ServerTagConfig?
@@ -44,14 +41,12 @@ model WelcomeConfig {
   goodbyeMessage           String   @default("{user} a quitté **{server}**.")
   sidebarColor             String   @default("#dc2626")
   goodbyeSidebarColor      String   @default("#dc2626")
-  dmWelcome                Boolean  @default(false)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
   mentionUser              Boolean  @default(true)
   backgroundColor          String   @default("#57F287")
   backgroundImage          String?
   goodbyeEnabled           Boolean  @default(false)
-  goodbyeMentionUser       Boolean  @default(false)
   goodbyeBackgroundColor   String   @default("#ED4245")
   goodbyeBackgroundImage   String?
   useEmbed                 Boolean  @default(true)
@@ -98,24 +93,6 @@ model TemporaryRoleGrant {
   Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([expiresAt])
-}
-
-model LogEntry {
-  id         String   @id
-  guildId    String
-  type       String
-  actorId    String?
-  actorName  String?
-  targetId   String?
-  targetName String?
-  channelId  String?
-  reason     String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  Guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
-
-  @@index([guildId, createdAt])
-  @@index([guildId, type])
 }
 
 model SavedMessage {
@@ -168,7 +145,7 @@ model TicketConfig {
   accessRoleIds       String[] @default([])
   askCloseReason      Boolean  @default(true)
   askOpenReason       Boolean  @default(true)
-  autoDeleteOnClose   Boolean  @default(true)
+  autoDeleteOnClose   Boolean  @default(false)
   confirmationMessage String   @default("Votre ticket a bien été envoyé, un membre du staff vous prendra rapidement en charge si votre ticket est accepté !")
   logChannelId        String?
   mentionModerators   Boolean  @default(true)
@@ -206,8 +183,6 @@ model UserXp {
   avatar        String?
   xp            Int       @default(0)
   level         Int       @default(0)
-  messageCount  Int       @default(0)
-  lastXpAt      DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime
   Guild         Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
@@ -227,7 +202,6 @@ model XpSettings {
   levelUpMessage         String   @default("{user}, vous venez de passer au niveau {level} !")
   ignoredChannelIds      String[] @default([])
   ignoredRoleIds         String[] @default([])
-  stackRoles             Boolean  @default(false)
   createdAt              DateTime @default(now())
   updatedAt              DateTime
   boosterChannelIds      String[] @default([])

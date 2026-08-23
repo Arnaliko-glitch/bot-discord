@@ -52,10 +52,6 @@ async function handleJoinOrLeave(member: GuildMember, kind: 'welcome' | 'goodbye
   const template = kind === 'welcome' ? config.message : config.goodbyeMessage;
   const description = applyPlaceholders(template, member, true);
 
-  if (kind === 'welcome' && config.dmWelcome) {
-    await member.send({ content: description }).catch(() => undefined); // DM fermé : on ignore.
-  }
-
   if (!enabled || !channelId) return;
 
   const channel = member.guild.channels.cache.get(channelId) ?? (await member.guild.channels.fetch(channelId).catch(() => null));

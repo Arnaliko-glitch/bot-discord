@@ -44,7 +44,7 @@ const DEFAULT_CONFIG: TicketsConfigData = {
   mentionModerators: true,
   maxOpenPerUser: 1,
   noReasonMessage: "N'hésitez pas à décrire votre problème, un membre du staff vous prendra rapidement en charge.",
-  autoDeleteOnClose: true,
+  autoDeleteOnClose: false,
   openingMessage: 'Bonjour {user}, décrivez votre problème et un membre du staff vous répondra sous peu.',
 };
 

@@ -81,7 +81,7 @@ export async function createTicketChannel(
 
   const actionMessage = await channel.send({
     content,
-    embeds: [openStateEmbed(guild.name, guild.iconURL() ?? undefined, reason)],
+    embeds: [openStateEmbed(guild.name, guild.iconURL() ?? undefined, reason, config.noReasonMessage)],
     components: [buildCloseRow()],
   });
   await prisma.ticket.update({ where: { id: ticket.id }, data: { activeCloseMessageId: actionMessage.id } });

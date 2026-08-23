@@ -32,7 +32,6 @@ interface WelcomeConfigData {
   goodbyeEnabled: boolean;
   goodbyeChannelId: string | null;
   goodbyeMessage: string;
-  goodbyeMentionUser: boolean;
   goodbyeBackgroundColor: string;
   goodbyeBackgroundImage: string | null;
   goodbyeBackgroundOverlay: boolean;
@@ -55,7 +54,6 @@ const DEFAULT_CONFIG: WelcomeConfigData = {
   goodbyeEnabled: false,
   goodbyeChannelId: null,
   goodbyeMessage: '{user} a quitté **{server}**.',
-  goodbyeMentionUser: false,
   goodbyeBackgroundColor: '#ED4245',
   goodbyeBackgroundImage: null,
   goodbyeBackgroundOverlay: true,

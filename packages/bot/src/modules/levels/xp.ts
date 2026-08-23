@@ -24,8 +24,6 @@ export async function grantXp(
     where: { guildId_discordUserId: { guildId: member.guild.id, discordUserId: member.id } },
     update: {
       xp: { increment: amount },
-      messageCount: { increment: 1 },
-      lastXpAt: new Date(),
       username: member.displayName,
       avatar: member.user.avatar,
       updatedAt: new Date(),
@@ -38,8 +36,6 @@ export async function grantXp(
       avatar: member.user.avatar,
       xp: amount,
       level: 0,
-      messageCount: 1,
-      lastXpAt: new Date(),
       updatedAt: new Date(),
     },
   });

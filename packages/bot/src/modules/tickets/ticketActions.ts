@@ -76,9 +76,14 @@ function swapPrefix(name: string, strip: string, add: string): string {
   return `${add}${stripped}`;
 }
 
-function openStateEmbed(guildName: string, guildIconUrl: string | undefined, reason: string | null): EmbedBuilder {
+function openStateEmbed(
+  guildName: string,
+  guildIconUrl: string | undefined,
+  reason: string | null,
+  noReasonMessage: string
+): EmbedBuilder {
   const embed = new EmbedBuilder().setColor(ACCENT_COLOR).setFooter({ text: `Ticket sur ${guildName}`, iconURL: guildIconUrl }).setTimestamp();
-  if (reason) embed.setDescription(`**Raison :** ${reason}`);
+  embed.setDescription(reason ? `**Raison :** ${reason}` : noReasonMessage);
   return embed;
 }
 
@@ -245,6 +250,14 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
     .setAuthor({ name: `${closerName} vient de fermer le ticket.`, iconURL: interaction.user.displayAvatarURL() });
   if (reason) noticeEmbed.setDescription(`**Raison :** ${reason}`);
   await channel.send({ embeds: [noticeEmbed] }).catch(() => undefined);
+
+  // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
+  // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
+  // qu'à une fermeture par le staff, pas quand le créateur ferme son propre
+  // ticket (il pourrait vouloir le consulter encore un peu).
+  if (config.autoDeleteOnClose && !isSelfClose) {
+    await deleteTicket(interaction, ticket, config);
+  }
 }
 
 // Réouverture — renomme "réouvert-", restaure l'accès du créateur, journalise.

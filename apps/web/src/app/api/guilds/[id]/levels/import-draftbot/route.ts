@@ -104,7 +104,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           avatar,
           xp,
           level,
-          messageCount: 0,
           updatedAt: new Date(),
         },
       });

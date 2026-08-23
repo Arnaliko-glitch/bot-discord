@@ -43,7 +43,6 @@ export default async function WelcomePage({ params }: { params: { guildId: strin
               goodbyeEnabled: config.goodbyeEnabled,
               goodbyeChannelId: config.goodbyeChannelId,
               goodbyeMessage: config.goodbyeMessage,
-              goodbyeMentionUser: config.goodbyeMentionUser,
               goodbyeBackgroundColor: config.goodbyeBackgroundColor,
               goodbyeBackgroundImage: config.goodbyeBackgroundImage,
               goodbyeBackgroundOverlay: config.goodbyeBackgroundOverlay,
