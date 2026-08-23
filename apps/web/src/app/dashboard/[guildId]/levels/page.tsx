@@ -64,6 +64,7 @@ export default async function LevelsPage({ params }: { params: { guildId: string
               xpInForumPosts: config.xpInForumPosts,
               voiceTextXpMode: config.voiceTextXpMode,
               viewOthersLevel: config.viewOthersLevel,
+              publicLeaderboardEnabled: config.publicLeaderboardEnabled,
               resetXpOnLeave: config.resetXpOnLeave,
               resetXpOnBan: config.resetXpOnBan,
               longMessageDoubleXp: config.longMessageDoubleXp,

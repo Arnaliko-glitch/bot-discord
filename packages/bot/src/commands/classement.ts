@@ -89,7 +89,7 @@ export const classementCommand: SlashCommand = {
       .setTimestamp();
 
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-    const components = appUrl
+    const components = appUrl && settings.publicLeaderboardEnabled
       ? [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()

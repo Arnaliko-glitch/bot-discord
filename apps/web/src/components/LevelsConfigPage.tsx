@@ -48,6 +48,7 @@ interface LevelsConfigData {
   xpInForumPosts: boolean;
   voiceTextXpMode: string;
   viewOthersLevel: boolean;
+  publicLeaderboardEnabled: boolean;
   resetXpOnLeave: boolean;
   resetXpOnBan: boolean;
   longMessageDoubleXp: boolean;
@@ -91,6 +92,7 @@ const DEFAULT_CONFIG: LevelsConfigData = {
   xpInForumPosts: true,
   voiceTextXpMode: 'everyone',
   viewOthersLevel: true,
+  publicLeaderboardEnabled: false,
   resetXpOnLeave: true,
   resetXpOnBan: false,
   longMessageDoubleXp: false,
@@ -1191,6 +1193,21 @@ export function LevelsConfigPage({
                 <Toggle checked={config.viewOthersLevel} onChange={(v) => update('viewOthersLevel', v)} />
                 <span className="text-sm text-gray-400">
                   Voulez-vous que les membres puissent regarder le niveau des autres membres du serveur ?
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Classement en ligne
+              </span>
+              <label className="flex cursor-pointer items-center gap-3">
+                <Toggle
+                  checked={config.publicLeaderboardEnabled}
+                  onChange={(v) => update('publicLeaderboardEnabled', v)}
+                />
+                <span className="text-sm text-gray-400">
+                  Souhaitez-vous activer la visibilité du classement de niveaux en ligne ?
                 </span>
               </label>
             </div>

@@ -15,7 +15,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!query) return NextResponse.json([]);
 
   const settings = await prisma.xpSettings.findUnique({ where: { guildId: params.id } });
-  if (!settings?.enabled) return NextResponse.json({ error: 'Module désactivé' }, { status: 404 });
+  if (!settings?.enabled || !settings.publicLeaderboardEnabled) {
+    return NextResponse.json({ error: 'Module désactivé' }, { status: 404 });
+  }
 
   const members = await searchGuildMembers(params.id, query, 20);
   const nonBotMembers = members.filter((m) => !m.user.bot);

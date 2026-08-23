@@ -30,7 +30,10 @@ export default async function LeaderboardPage({ params }: { params: { guildId: s
     fetchGuildMembers(params.guildId),
   ]);
 
-  if (!guild || !settings?.enabled) notFound();
+  // 404 aussi bien si le module niveaux est désactivé que si l'admin a
+  // spécifiquement coupé la visibilité du classement en ligne — dans ce
+  // dernier cas, la page reste inaccessible même en tapant l'URL directement.
+  if (!guild || !settings?.enabled || !settings.publicLeaderboardEnabled) notFound();
 
   const roles = rewards.length > 0 ? await fetchGuildRoles(params.guildId) : [];
   const roleMap = new Map(roles.map((r) => [r.id, r]));

@@ -218,6 +218,7 @@ model XpSettings {
   rewardChannelId        String?
   rewardMessage          String   @default("{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !")
   viewOthersLevel        Boolean  @default(true)
+  publicLeaderboardEnabled Boolean @default(false)
   xpChannelMode          String   @default("without")
   xpInForumPosts         Boolean  @default(true)
   xpInThreads            Boolean  @default(true)
