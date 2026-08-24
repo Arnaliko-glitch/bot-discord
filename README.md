@@ -10,10 +10,12 @@ Monorepo pnpm : tableau de bord web (Next.js) + bot Discord (discord.js), config
 ## Fonctionnalités
 
 - **Arrivées et départs** — message et bannière générée dynamiquement (avatar cerclé, fond en image uploadée ou URL, ou couleur), variables `{user}` / `{server}` / `{server.membercount}`, mention du membre découplée du simple affichage.
-- **Niveaux** — XP par message et en vocal (courbe et cooldown configurables), classement (`/niveau`, `/classement`, page publique `/leaderboard/[guildId]`), récompenses de rôle par palier (permanentes ou temporaires).
-- **Messages** — composeur de messages interactifs : embeds multiples, galerie d'images, boutons (ouvrir un ticket ou rediriger vers un lien), aperçu fidèle au rendu Discord, brouillons.
-- **Tickets** — création via bouton ou `/panel-ticket`, validation/refus, fermeture et réouverture avec motif.
+- **Niveaux** — XP par message et en vocal (courbe et cooldown configurables), classement (`/niveau`, `/classement`, page publique paginée `/leaderboard/[guildId]`, activable/désactivable), récompenses de rôle par palier (permanentes ou temporaires), import de l'historique XP depuis DraftBot.
+- **Messages** — composeur de messages interactifs : contenu, embeds multiples (auteur + icône, titre cliquable, champs, footer + icône, vignette et image), galerie d'images autonome, boutons (ouvrir un ticket ou rediriger vers un lien), aperçu fidèle au rendu Discord, brouillons.
+- **Rôles-réactions** — panneaux où réagir avec un emoji donne un rôle (et le retire au retrait de la réaction) ; contenu, image et/ou embed au choix, synchronisation automatique des réactions à chaque republication.
+- **Tickets** — création via bouton ou `/panel-ticket`, validation/refus, fermeture et réouverture avec motif, suppression automatique optionnelle quand un membre du staff ferme le ticket.
 - **Tag du serveur** — attribue automatiquement un rôle aux membres qui affichent le tag ("identité de serveur") de ce serveur sur leur profil Discord.
+- **Logs** — salon de logs pour les événements du tag du serveur (ajout/retrait), catégories supplémentaires à venir.
 - **Accueil** — nombre de membres et graphique de variation nette (arrivées/départs) sur 30/60/90 jours, résumé `/statistiques` en salon.
 
 ## Développement local
