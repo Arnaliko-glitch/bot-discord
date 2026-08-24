@@ -12,3 +12,4 @@ coverage/
 *.tsbuildinfo
 apps/web/public/uploads/
 packages/database/generated/
+.claude/
