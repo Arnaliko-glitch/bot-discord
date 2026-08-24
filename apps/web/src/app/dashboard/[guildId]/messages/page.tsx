@@ -4,13 +4,16 @@ import { MessagesConfigPage, type EmbedData, type MessageButtonData } from '@/co
 
 const BLANK_EMBED: EmbedData = {
   authorName: null,
+  authorIconUrl: null,
   title: null,
+  titleUrl: null,
   description: null,
   color: null,
   fields: [],
   imageUrl: null,
   thumbnailUrl: null,
   footerText: null,
+  footerIconUrl: null,
 };
 
 const BLANK_BUTTON: MessageButtonData = {

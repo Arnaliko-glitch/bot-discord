@@ -1,36 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { prisma } from '@discord-bot-dashboard/database';
 import { requireGuildAccess } from '@/lib/guild-access';
+import { buildDiscordRequestBody, fetchStandaloneImage } from '@/lib/discord-attachment';
+import { buildOneEmbed, type EmbedData } from '@/lib/discord-embed';
 
 type Params = { params: { id: string; messageId: string } };
-
-const UPLOADS_ROOT = path.join(process.cwd(), 'public', 'uploads');
-
-const IMAGE_CONTENT_TYPES: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-};
-
-function guessImageContentType(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  return IMAGE_CONTENT_TYPES[ext] ?? 'application/octet-stream';
-}
-
-interface EmbedData {
-  authorName?: string | null;
-  title?: string | null;
-  description?: string | null;
-  color?: string | null;
-  fields?: { name: string; value: string }[];
-  imageUrl?: string | null;
-  thumbnailUrl?: string | null;
-  footerText?: string | null;
-}
 
 interface ButtonData {
   label?: string | null;
@@ -87,31 +61,11 @@ function buildComponents(raw: unknown): Record<string, unknown>[] {
   return components.length > 0 ? [{ type: 1, components }] : [];
 }
 
-function toAbsoluteUrl(url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-  return `${appUrl}${url}`;
-}
-
 // Les messages enregistrés avant le passage aux embeds multiples stockent un
 // objet unique en base plutôt qu'un tableau — on l'accepte toujours en lecture.
 function normalizeEmbeds(raw: unknown): EmbedData[] {
   if (!raw) return [];
   return (Array.isArray(raw) ? raw : [raw]) as EmbedData[];
-}
-
-function buildOneEmbed(embedData: EmbedData): Record<string, unknown> {
-  const embed: Record<string, unknown> = {};
-  if (embedData.authorName) embed.author = { name: embedData.authorName };
-  if (embedData.title) embed.title = embedData.title;
-  if (embedData.description) embed.description = embedData.description;
-  if (embedData.color) embed.color = parseInt(embedData.color.replace('#', ''), 16);
-  const fields = (embedData.fields ?? []).filter((f) => f.name && f.value);
-  if (fields.length > 0) embed.fields = fields;
-  if (embedData.footerText) embed.footer = { text: embedData.footerText };
-  if (embedData.thumbnailUrl) embed.thumbnail = { url: toAbsoluteUrl(embedData.thumbnailUrl) };
-  if (embedData.imageUrl) embed.image = { url: toAbsoluteUrl(embedData.imageUrl) };
-  return embed;
 }
 
 function buildDiscordPayload(message: {
@@ -132,31 +86,6 @@ function buildDiscordPayload(message: {
     // Discord garder d'anciens boutons retirés depuis côté dashboard.
     components: buildComponents(message.buttons),
   };
-}
-
-// Récupère les octets de l'image autonome (attachée telle quelle au message,
-// jamais dans un embed) : lecture disque directe pour nos propres uploads,
-// téléchargement pour un lien externe collé par l'utilisateur.
-async function fetchStandaloneImage(
-  url: string,
-  guildId: string
-): Promise<{ filename: string; data: Buffer; contentType: string } | null> {
-  if (url.startsWith(`/uploads/${guildId}/`)) {
-    const filePath = path.join(UPLOADS_ROOT, url.slice('/uploads/'.length));
-    const data = await readFile(filePath).catch(() => null);
-    const filename = path.basename(filePath);
-    return data ? { filename, data, contentType: guessImageContentType(filename) } : null;
-  }
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = Buffer.from(await res.arrayBuffer());
-    const filename = path.basename(new URL(url).pathname) || 'image.png';
-    const contentType = res.headers.get('content-type')?.split(';')[0].trim() || guessImageContentType(filename);
-    return { filename, data, contentType };
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -191,34 +120,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   );
   const attachments = fetchedAttachments.filter((a): a is NonNullable<typeof a> => a !== null);
 
-  const token = process.env.DISCORD_BOT_TOKEN;
   const canEdit = mode === 'edit' && hasEditableMessage;
   const url = canEdit
     ? `https://discord.com/api/v10/channels/${message.channelId}/messages/${message.lastSentMessageId}`
     : `https://discord.com/api/v10/channels/${message.channelId}/messages`;
 
-  let body: BodyInit;
-  const headers: Record<string, string> = { Authorization: `Bot ${token}` };
-  if (attachments.length > 0) {
-    const form = new FormData();
-    form.append(
-      'payload_json',
-      JSON.stringify({ ...payload, attachments: attachments.map((_, i) => ({ id: i })) })
-    );
-    attachments.forEach((attachment, i) => {
-      form.append(
-        `files[${i}]`,
-        new Blob([new Uint8Array(attachment.data)], { type: attachment.contentType }),
-        attachment.filename
-      );
-    });
-    body = form;
-  } else {
-    headers['Content-Type'] = 'application/json';
-    // Toujours explicite (même sans image) : sur une édition, omettre ce
-    // champ ferait garder par défaut une éventuelle pièce jointe précédente.
-    body = JSON.stringify({ ...payload, attachments: [] });
-  }
+  const { headers, body } = buildDiscordRequestBody(payload, attachments);
 
   const res = await fetch(url, {
     method: canEdit ? 'PATCH' : 'POST',

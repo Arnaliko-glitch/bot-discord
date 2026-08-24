@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ArrowLeftRight, DoorOpen, Home, MessageSquare, ScrollText, Tag, Ticket, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, DoorOpen, Home, MessageSquare, ScrollText, SmilePlus, Tag, Ticket, TrendingUp } from 'lucide-react';
 import { UnsavedChangesProvider, useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
 // Réduit aux modules déjà (ou bientôt) reconstruits — les autres reviendront
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { slug: 'welcome', label: 'Arrivées et départs', icon: DoorOpen },
   { slug: 'levels', label: 'Niveaux', icon: TrendingUp },
   { slug: 'messages', label: 'Message', icon: MessageSquare },
+  { slug: 'reaction-roles', label: 'Rôles-Réactions', icon: SmilePlus },
   { slug: 'tickets', label: 'Tickets', icon: Ticket },
   { slug: 'server-tag', label: 'Tag du serveur', icon: Tag },
   { slug: 'logs', label: 'Logs', icon: ScrollText },

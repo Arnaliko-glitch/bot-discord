@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { Client, GatewayIntentBits, Events, MessageFlags } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Events, MessageFlags } from 'discord.js';
 
 // Un seul .env à la racine du monorepo, partagé avec apps/web — résolu par
 // rapport à ce fichier (pas process.cwd(), qui vaut packages/bot en dev).
@@ -19,6 +19,7 @@ import { xpResetModule } from './modules/levels/xpReset.js';
 import { commands } from './commands/index.js';
 import { handleTicketInteraction } from './modules/tickets/interactions.js';
 import { startPresenceRotation } from './modules/presence.js';
+import { reactionRolesModule } from './modules/reactionRoles/index.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
@@ -39,9 +40,14 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
   ],
+  // Nécessaires pour recevoir les événements de réaction (ajout/retrait de
+  // rôle) même sur un message posté avant le démarrage du bot, donc jamais
+  // mis en cache — sinon Discord n'envoie tout simplement pas l'événement.
+  partials: [Partials.Message, Partials.Reaction, Partials.User],
   rest: {
     // Discord ne limite le renommage d'un salon qu'à 2 fois toutes les 10
     // minutes — par défaut discord.js mettrait la requête en attente et
@@ -67,7 +73,13 @@ const messageXpModule: BotModuleHandler = {
 };
 
 // Ajouté au fur et à mesure que chaque module est reconstruit.
-const modules: BotModuleHandler[] = [welcomeModule, messageXpModule, memberStatsModule, serverTagModule];
+const modules: BotModuleHandler[] = [
+  welcomeModule,
+  messageXpModule,
+  memberStatsModule,
+  serverTagModule,
+  reactionRolesModule,
+];
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {

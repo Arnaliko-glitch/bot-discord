@@ -21,6 +21,7 @@ model Guild {
   LevelRole          LevelRole[]
   TemporaryRoleGrant TemporaryRoleGrant[]
   LogsConfig         LogsConfig?
+  ReactionRolePanel  ReactionRolePanel[]
   SavedMessage       SavedMessage[]
   ServerTagConfig    ServerTagConfig?
   Ticket             Ticket[]
@@ -284,6 +285,36 @@ model LogsConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   Guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+// Un panneau "rôles-réactions" : un message (posté ou attaché à un message
+// déjà envoyé) où réagir avec un emoji donné ajoute le rôle associé, et
+// retirer la réaction le retire — pas de relation formelle vers les rôles
+// Discord (juste des ids), comme le reste du projet qui ne duplique jamais
+// les rôles/salons en base. `mappings` : [{ emoji, roleId }].
+// `messageId` reste vide tant que le panneau n'a jamais été publié.
+model ReactionRolePanel {
+  id          String   @id
+  guildId     String
+  name        String
+  channelId   String?
+  messageId   String?  @unique
+  // "normal" = ajoute le rôle à la réaction, le retire au retrait — seul
+  // mode pour l'instant, gardé en colonne pour ajouter d'autres modes plus
+  // tard sans nouvelle migration.
+  mode        String   @default("normal")
+  content     String?
+  imageUrl    String?
+  // Un seul embed (même forme que EmbedData/EmbedEditor.tsx, comme le
+  // composeur de messages) — null tant que l'utilisateur n'a pas cliqué sur
+  // l'onglet Embed, pas de valeurs par défaut déduites.
+  embedData   Json?
+  mappings    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
 }
 
 // Ligne unique mise à jour périodiquement par le process du bot (voir
