@@ -92,15 +92,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       const { level, xp } = convertToLocalXp(member, curveStyle, curveMultiplier);
       const liveMember = liveMemberMap.get(member.discordUserId);
       const username = liveMember ? resolveDisplayName(liveMember) : member.displayName;
+      const handle = liveMember?.user.username ?? null;
       const avatar = liveMember?.user.avatar ?? null;
       return prisma.userXp.upsert({
         where: { guildId_discordUserId: { guildId: params.id, discordUserId: member.discordUserId } },
-        update: { xp, level, username, avatar, updatedAt: new Date() },
+        update: { xp, level, username, handle, avatar, updatedAt: new Date() },
         create: {
           id: crypto.randomUUID(),
           guildId: params.id,
           discordUserId: member.discordUserId,
           username,
+          handle,
           avatar,
           xp,
           level,

@@ -185,6 +185,10 @@ model UserXp {
   guildId       String
   discordUserId String
   username      String
+  // Pseudo de connexion Discord (ex: "jtefumesousweed"), distinct du pseudo
+  // affiché ci-dessus — stocké séparément pour rester disponible dans le
+  // classement même quand le membre n'est plus dans le cache du bot.
+  handle        String?
   avatar        String?
   xp            Int       @default(0)
   level         Int       @default(0)

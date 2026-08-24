@@ -10,10 +10,6 @@ import { levelProgress } from '@discord-bot-dashboard/shared';
 // le code — à garder synchronisée si cette couleur change.
 const ACCENT = '#ED4245';
 
-// Nombre de lignes affichées à la fois — "Charger plus" en révèle une
-// tranche de plus depuis la liste déjà en mémoire, sans requête réseau.
-const PAGE_SIZE = 100;
-
 // Contour de l'avatar (et couleur assortie du badge de rang, de l'anneau de
 // niveau et du panneau de stats) : or/argent/bronze pour le podium, rouge
 // pour le reste du classement.
@@ -100,6 +96,7 @@ export function PublicLeaderboardPage({
   guildName,
   guildIconUrl,
   initialEntries,
+  initialHasMore,
   rewards,
   curveStyle,
   curveMultiplier,
@@ -108,13 +105,30 @@ export function PublicLeaderboardPage({
   guildName: string;
   guildIconUrl: string | null;
   initialEntries: LeaderboardEntry[];
+  initialHasMore: boolean;
   rewards: RewardInfo[];
   curveStyle: string;
   curveMultiplier: number;
 }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<LeaderboardEntry[] | null>(null);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [entries, setEntries] = useState(initialEntries);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/public/guilds/${guildId}/leaderboard?offset=${entries.length}`);
+      if (res.ok) {
+        const data: { rows: LeaderboardEntry[]; hasMore: boolean } = await res.json();
+        setEntries((e) => [...e, ...data.rows]);
+        setHasMore(data.hasMore);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -139,12 +153,12 @@ export function PublicLeaderboardPage({
     };
   }, [guildId, query]);
 
-  // Pas de recherche en cours : la liste complète est déjà en mémoire côté
-  // client (voir leaderboard/[guildId]/page.tsx), "Charger plus" ne fait que
-  // révéler la suite sans requête réseau. Pendant une recherche, l'API la
-  // borne déjà à 20 résultats — pas de pagination à gérer dans ce cas.
-  const list = searchResults ?? initialEntries.slice(0, visibleCount);
-  const hasMore = !searchResults && visibleCount < initialEntries.length;
+  // Pas de recherche en cours : la liste vient de fetchLeaderboardPage,
+  // chargée par tranches via l'API à chaque "Charger plus" (voir loadMore
+  // ci-dessus). Pendant une recherche, l'API la borne déjà à 20 résultats —
+  // pas de pagination à gérer dans ce cas.
+  const list = searchResults ?? entries;
+  const showLoadMore = !searchResults && hasMore;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
@@ -230,13 +244,14 @@ export function PublicLeaderboardPage({
           })}
           </div>
 
-          {hasMore && (
+          {showLoadMore && (
             <button
               type="button"
-              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-              className="btn-secondary mt-3 w-full text-sm"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="btn-secondary mt-3 w-full text-sm disabled:opacity-50"
             >
-              Charger plus
+              {loadingMore ? 'Chargement...' : 'Charger plus'}
             </button>
           )}
         </div>

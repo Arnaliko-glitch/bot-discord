@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@discord-bot-dashboard/database';
-import { userAvatarUrl } from '@/lib/auth';
-import { fetchGuildMembers, resolveDisplayName } from '@/lib/discord-members';
+import { fetchLeaderboardPage } from '@/lib/leaderboard';
 import { PublicLeaderboardPage } from '@/components/PublicLeaderboardPage';
 
 interface DiscordRole {
@@ -22,12 +21,11 @@ async function fetchGuildRoles(guildId: string): Promise<DiscordRole[]> {
 // Page publique (aucune session requise) — classement complet d'un serveur,
 // pointée par le bouton de la commande Discord /classement.
 export default async function LeaderboardPage({ params }: { params: { guildId: string } }) {
-  const [guild, settings, userXpRows, rewards, members] = await Promise.all([
+  const [guild, settings, rewards, firstPage] = await Promise.all([
     prisma.guild.findUnique({ where: { id: params.guildId } }),
     prisma.xpSettings.findUnique({ where: { guildId: params.guildId } }),
-    prisma.userXp.findMany({ where: { guildId: params.guildId } }),
     prisma.levelRole.findMany({ where: { guildId: params.guildId }, orderBy: { level: 'asc' } }),
-    fetchGuildMembers(params.guildId),
+    fetchLeaderboardPage(params.guildId, 0),
   ]);
 
   // 404 aussi bien si le module niveaux est désactivé que si l'admin a
@@ -38,44 +36,10 @@ export default async function LeaderboardPage({ params }: { params: { guildId: s
   const roles = rewards.length > 0 ? await fetchGuildRoles(params.guildId) : [];
   const roleMap = new Map(roles.map((r) => [r.id, r]));
 
-  // Le nom "affiché" (pseudo serveur > nom global > pseudo Discord) vient du
-  // membre récupéré en direct — repli sur la colonne stockée si le membre a
-  // quitté le serveur (absent de la liste actuelle).
-  const memberMap = new Map(members.map((m) => [m.user.id, m]));
-  const xpMap = new Map(userXpRows.map((u) => [u.discordUserId, u]));
-
-  const fromXp = userXpRows.map((entry) => {
-    const member = memberMap.get(entry.discordUserId);
-    return {
-      userId: entry.discordUserId,
-      username: member ? resolveDisplayName(member) : entry.username,
-      avatarUrl: member
-        ? userAvatarUrl(entry.discordUserId, member.user.avatar)
-        : userAvatarUrl(entry.discordUserId, entry.avatar),
-      xp: entry.xp,
-      level: entry.level,
-    };
-  });
-
-  // Complète avec les membres réels du serveur qui n'ont pas encore gagné
-  // d'xp, pour afficher tout le monde plutôt que seulement les participants.
-  const fillMembers = members
-    .filter((m) => !m.user.bot && !xpMap.has(m.user.id))
-    .map((m) => ({
-      userId: m.user.id,
-      username: resolveDisplayName(m),
-      avatarUrl: userAvatarUrl(m.user.id, m.user.avatar),
-      xp: 0,
-      level: 0,
-    }));
-
-  // Pas de troncature ici : la liste complète (plafonnée par fetchGuildMembers
-  // à 1000 membres, la limite d'une page de l'API Discord) part côté client,
-  // qui n'en affiche qu'une partie à la fois via "Charger plus" — un simple
-  // dépliage sans aller-retour réseau supplémentaire.
-  const entries = [...fromXp, ...fillMembers]
-    .sort((a, b) => b.xp - a.xp)
-    .map((entry, i) => ({ rank: i + 1, ...entry }));
+  // Seule la première page est chargée ici (voir fetchLeaderboardPage) — la
+  // suite arrive via l'API à mesure qu'on clique sur "Charger plus", plutôt
+  // que de charger toute la table UserXp de la guilde d'un coup.
+  const { rows: entries, hasMore } = firstPage;
 
   const rewardList = rewards.map((reward) => {
     const role = roleMap.get(reward.roleId);
@@ -94,6 +58,7 @@ export default async function LeaderboardPage({ params }: { params: { guildId: s
       guildName={guild.name}
       guildIconUrl={guildIconUrl}
       initialEntries={entries}
+      initialHasMore={hasMore}
       rewards={rewardList}
       curveStyle={settings.curveStyle}
       curveMultiplier={settings.curveMultiplier}
