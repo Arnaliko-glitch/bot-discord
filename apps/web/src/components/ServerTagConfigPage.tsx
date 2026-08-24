@@ -6,6 +6,7 @@ import { Poppins } from 'next/font/google';
 import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
 import { EmojiPickerButton } from '@/components/EmojiPickerButton';
 import { MentionTextarea, renderMentionText, type RoleOption } from '@/components/MentionTextarea';
+import { RoleSelect } from '@/components/RoleSelect';
 import type { GuildEmoji } from '@/lib/emoji-data';
 import { useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
@@ -233,14 +234,13 @@ export function ServerTagConfigPage({
           <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
             Rôle à attribuer
           </span>
-          <select value={config.roleId ?? ''} onChange={(e) => update('roleId', e.target.value || null)} className="input">
-            <option value="">Veuillez sélectionner un rôle</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id} style={r.color ? { color: r.color } : undefined}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <RoleSelect
+            label=""
+            roles={roles}
+            value={config.roleId ?? ''}
+            onChange={(v) => update('roleId', v || null)}
+            placeholder="Veuillez sélectionner un rôle"
+          />
         </div>
       </div>
 

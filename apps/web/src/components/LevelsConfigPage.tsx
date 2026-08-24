@@ -8,6 +8,7 @@ import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
 import { EmojiPickerButton } from '@/components/EmojiPickerButton';
 import { MentionTextarea, renderMentionText, type RoleOption } from '@/components/MentionTextarea';
 import { MultiEntitySelect } from '@/components/MultiEntitySelect';
+import { RoleSelect } from '@/components/RoleSelect';
 import type { GuildEmoji } from '@/lib/emoji-data';
 import { useUnsavedChanges } from '@/lib/unsaved-changes-context';
 import { XpCurveChart } from '@/components/XpCurveChart';
@@ -578,14 +579,13 @@ function RewardModal({
           <>
             <div className="mt-4">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Rôle</span>
-              <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className="input">
-                <option value="">Veuillez sélectionner un rôle</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id} style={r.color ? { color: r.color } : undefined}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              <RoleSelect
+                label=""
+                roles={roles}
+                value={roleId}
+                onChange={setRoleId}
+                placeholder="Veuillez sélectionner un rôle"
+              />
             </div>
 
             <div className="mt-4">
@@ -640,14 +640,13 @@ function RewardModal({
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Rôle temporaire
               </span>
-              <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className="input">
-                <option value="">Veuillez sélectionner un rôle</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id} style={r.color ? { color: r.color } : undefined}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              <RoleSelect
+                label=""
+                roles={roles}
+                value={roleId}
+                onChange={setRoleId}
+                placeholder="Veuillez sélectionner un rôle"
+              />
             </div>
 
             <div className="mt-4">
