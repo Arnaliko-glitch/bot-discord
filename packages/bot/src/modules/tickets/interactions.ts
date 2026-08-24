@@ -164,7 +164,9 @@ async function handleApprove(interaction: ButtonInteraction) {
   });
 
   const requester = await interaction.client.users.fetch(request.requesterId).catch(() => null);
-  const channel = requester ? await createTicketChannel(guild, requester, request.reason, config, interaction.user) : null;
+  const channel = requester
+    ? await createTicketChannel(guild, requester, request.reason, config, interaction.user, request.id)
+    : null;
 
   const decisionEmbed = new EmbedBuilder()
     .setColor(0x57f287)

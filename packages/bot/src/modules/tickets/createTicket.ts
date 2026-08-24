@@ -37,7 +37,8 @@ export async function createTicketChannel(
   requester: User,
   reason: string | null,
   config: TicketConfig,
-  approvedBy?: User | null
+  approvedBy?: User | null,
+  requestId?: string | null
 ): Promise<import('discord.js').TextChannel> {
   const overwrites: OverwriteResolvable[] = [
     { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
@@ -67,6 +68,7 @@ export async function createTicketChannel(
       subject: reason,
       status: 'open',
       updatedAt: new Date(),
+      requestId: requestId ?? null,
     },
   });
 

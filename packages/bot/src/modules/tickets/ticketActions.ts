@@ -138,23 +138,29 @@ async function renameChannelOrNotify(
 // Supprimer) — si ce message a disparu ou ne peut plus être édité (supprimé
 // manuellement, désynchronisé...), on en repost un neuf plutôt que de rester
 // silencieux : le ticket ne doit jamais se retrouver sans bouton utilisable.
-async function updateActionMessage(interaction: TicketInteraction, ticket: Ticket, embed: EmbedBuilder, row: ActionRowBuilder<ButtonBuilder>) {
+async function updateActionMessage(
+  interaction: TicketInteraction,
+  ticket: Ticket,
+  embed: EmbedBuilder,
+  row?: ActionRowBuilder<ButtonBuilder>
+) {
   const channel = interaction.channel;
   if (!channel || !('send' in channel)) return;
+  const components = row ? [row] : [];
 
   const message = ticket.activeCloseMessageId
     ? await channel.messages.fetch(ticket.activeCloseMessageId).catch(() => null)
     : null;
 
   if (message) {
-    const edited = await (message as Message).edit({ embeds: [embed], components: [row] }).catch((err) => {
+    const edited = await (message as Message).edit({ embeds: [embed], components }).catch((err) => {
       console.error('Édition du message d\'action du ticket échouée:', err);
       return null;
     });
     if (edited) return;
   }
 
-  const fresh = await channel.send({ embeds: [embed], components: [row] }).catch((err) => {
+  const fresh = await channel.send({ embeds: [embed], components }).catch((err) => {
     console.error('Envoi du message d\'action du ticket échoué:', err);
     return null;
   });
@@ -213,6 +219,17 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
   );
   if (lines.length > 0) closedEmbed.setDescription(lines.join('\n'));
 
+  // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
+  // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
+  // qu'à une fermeture par le staff, pas quand le créateur ferme son propre
+  // ticket (il pourrait vouloir le consulter encore un peu). Dans ce cas on
+  // n'affiche pas les boutons "Réouvrir/Supprimer" (le salon va disparaître
+  // dans l'instant, ils seraient trompeurs), on saute l'annonce dans le
+  // salon (inutile puisqu'il va être supprimé juste après) et on ne
+  // journalise pas la fermeture séparément — deleteTicket journalise déjà
+  // une seule entrée "supprimé" avec la raison, pas la peine d'en avoir deux.
+  const autoDelete = config.autoDeleteOnClose && !isSelfClose;
+
   await Promise.all([
     'permissionOverwrites' in channel
       ? channel.permissionOverwrites
@@ -223,7 +240,7 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
       where: { id: ticket.id },
       data: { status: 'closed', closedBy: interaction.user.id, closedAt: new Date(), closeReason: reason, updatedAt: new Date() },
     }),
-    logToTicketChannel(interaction, config, logEmbed),
+    autoDelete ? Promise.resolve() : logToTicketChannel(interaction, config, logEmbed),
     reason
       ? creator
           ?.send({
@@ -235,7 +252,7 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
           })
           .catch(() => undefined)
       : Promise.resolve(),
-    updateActionMessage(interaction, ticket, closedEmbed, buildClosedStateRow()),
+    updateActionMessage(interaction, ticket, closedEmbed, autoDelete ? undefined : buildClosedStateRow()),
   ]);
 
   await interaction
@@ -245,19 +262,16 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
     })
     .catch(() => undefined);
 
+  if (autoDelete) {
+    await deleteTicket(interaction, { ...ticket, closedBy: interaction.user.id, closeReason: reason }, config, true);
+    return;
+  }
+
   const noticeEmbed = new EmbedBuilder()
     .setColor(CLOSED_COLOR)
     .setAuthor({ name: `${closerName} vient de fermer le ticket.`, iconURL: interaction.user.displayAvatarURL() });
   if (reason) noticeEmbed.setDescription(`**Raison :** ${reason}`);
   await channel.send({ embeds: [noticeEmbed] }).catch(() => undefined);
-
-  // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
-  // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
-  // qu'à une fermeture par le staff, pas quand le créateur ferme son propre
-  // ticket (il pourrait vouloir le consulter encore un peu).
-  if (config.autoDeleteOnClose && !isSelfClose) {
-    await deleteTicket(interaction, ticket, config);
-  }
 }
 
 // Réouverture — renomme "réouvert-", restaure l'accès du créateur, journalise.
@@ -323,7 +337,17 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
 }
 
 // Suppression définitive — uniquement possible sur un ticket déjà fermé.
-export async function deleteTicket(interaction: TicketInteraction, ticket: Ticket, config: TicketConfig) {
+// `includeCloseReason` n'est vrai que pour l'appel depuis closeTicket en
+// suppression automatique, où ce message de log remplace le message de
+// fermeture (donc doit reprendre sa raison) — pour une suppression manuelle
+// d'un ticket déjà fermé, la raison a déjà été journalisée à la fermeture,
+// pas la peine de la répéter ici.
+export async function deleteTicket(
+  interaction: TicketInteraction,
+  ticket: Ticket,
+  config: TicketConfig,
+  includeCloseReason = false
+) {
   const channel = interaction.channel;
   if (!channel || !interaction.guild || !('send' in channel)) return;
 
@@ -336,18 +360,24 @@ export async function deleteTicket(interaction: TicketInteraction, ticket: Ticke
   ]);
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
+  // Pas de raison affichée si le créateur a fermé lui-même son ticket (aucune
+  // raison n'est jamais demandée dans ce cas) — même règle que dans
+  // closeTicket.
+  const wasSelfClosed = ticket.closedBy === ticket.creatorId;
+  const deletedEmbed = new EmbedBuilder()
+    .setColor(CLOSED_COLOR)
+    .setAuthor({
+      name: `${deleterName} a supprimé le ticket de ${creatorDisplayName} (@${creator?.username ?? ticket.creatorName}).`,
+      iconURL: interaction.user.displayAvatarURL(),
+    });
+  if (includeCloseReason && !wasSelfClosed) {
+    deletedEmbed.setDescription(`**Raison :** ${ticket.closeReason ?? 'Aucune raison spécifiée (pas de MP)'}`);
+  }
+
   await Promise.all([
-    prisma.ticket.update({ where: { id: ticket.id }, data: { status: 'deleted', updatedAt: new Date() } }),
-    logToTicketChannel(
-      interaction,
-      config,
-      new EmbedBuilder()
-        .setColor(CLOSED_COLOR)
-        .setAuthor({
-          name: `${deleterName} a supprimé le ticket fermé de ${creatorDisplayName} (@${creator?.username ?? ticket.creatorName}).`,
-          iconURL: interaction.user.displayAvatarURL(),
-        })
-    ),
+    prisma.ticket.delete({ where: { id: ticket.id } }),
+    ticket.requestId ? prisma.ticketRequest.delete({ where: { id: ticket.requestId } }).catch(() => undefined) : Promise.resolve(),
+    logToTicketChannel(interaction, config, deletedEmbed),
   ]);
 
   await channel.delete().catch((err) => console.error('Suppression ticket échouée:', err));
