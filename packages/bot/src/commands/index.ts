@@ -6,11 +6,14 @@ import { statistiquesCommand } from './statistiques.js';
 import { testTagLogCommand } from './testTagLog.js';
 import { testAddXpCommand } from './testAddXp.js';
 import { testTagAnnounceCommand } from './testTagAnnounce.js';
+import { testCardsCommand } from './testCards.js';
 
 // Commandes de développement — jamais déployées en production (voir
 // deploy-commands.ts, qui utilise directement ce tableau).
 const devCommands: SlashCommand[] =
-  process.env.NODE_ENV === 'production' ? [] : [testTagLogCommand, testAddXpCommand, testTagAnnounceCommand];
+  process.env.NODE_ENV === 'production'
+    ? []
+    : [testTagLogCommand, testAddXpCommand, testTagAnnounceCommand, testCardsCommand];
 
 export const commands: SlashCommand[] = [
   niveauCommand,

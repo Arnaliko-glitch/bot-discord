@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: ServerTagConfigData = {
   announceMessage: '{user}, voici votre récompense pour avoir mis le tag du serveur ! 🏷️',
 };
 
-const ACCENT_COLOR = '#ED4245';
+const ACCENT_COLOR = '#dc2626';
 
 // Même police que les cartes de récompense générées côté bot
 // (packages/bot/src/utils/celebrationCard.ts) — pour que l'aperçu
@@ -99,13 +99,13 @@ function AnnounceMessagePreview({
 
       <div className="flex overflow-hidden rounded">
         <div className="w-1 shrink-0" style={{ backgroundColor: ACCENT_COLOR }} />
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#2b2d31] p-3">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#1a1d23] p-3">
           <div className="flex min-w-0 items-center gap-3">
             <img
               src={avatarUrl}
               alt=""
               className="h-14 w-14 shrink-0 rounded-full"
-              style={{ boxShadow: `0 0 0 2px ${ACCENT_COLOR}` }}
+              style={{ boxShadow: '0 0 0 2px #ffffff' }}
             />
             <div className={`min-w-0 ${cardFont.className}`}>
               <p className="text-lg font-bold text-white">Félicitations !</p>

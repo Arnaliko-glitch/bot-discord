@@ -29,7 +29,7 @@ export interface EmbedData {
 }
 
 export const EMBED_COLOR_SWATCHES = ['#ED4245', '#57F287', '#5865F2', '#F0A020'];
-export const DEFAULT_EMBED_COLOR = '#5865F2';
+export const DEFAULT_EMBED_COLOR = '#dc2626';
 
 export const BLANK_EMBED: EmbedData = {
   authorName: null,

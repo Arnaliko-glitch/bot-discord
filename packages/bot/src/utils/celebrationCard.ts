@@ -1,13 +1,8 @@
-import { createCanvas, GlobalFonts, loadImage, type Image } from '@napi-rs/canvas';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createCanvas, loadImage, type Image } from '@napi-rs/canvas';
+import { FONT_STACK } from './fonts.js';
 
-const WIDTH = 500;
-const HEIGHT = 150;
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FONT_FAMILY = 'Poppins ExtraBold';
-GlobalFonts.registerFromPath(path.resolve(__dirname, '../../assets/fonts/Poppins-ExtraBold.ttf'), FONT_FAMILY);
+const WIDTH = 525;
+const HEIGHT = 155;
 
 export interface CelebrationCardOptions {
   avatarUrl: string;
@@ -54,10 +49,10 @@ export async function generateCelebrationCard({
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#2b2d31';
+  ctx.fillStyle = '#1a1d23';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  const avatarSize = 96;
+  const avatarSize = 104;
   const avatarX = 28;
   const avatarY = (HEIGHT - avatarSize) / 2;
 
@@ -65,7 +60,7 @@ export async function generateCelebrationCard({
   ctx.beginPath();
   ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2 + 4, 0, Math.PI * 2);
   ctx.closePath();
-  ctx.fillStyle = accentColor;
+  ctx.fillStyle = '#ffffff';
   ctx.fill();
   ctx.restore();
 
@@ -83,21 +78,21 @@ export async function generateCelebrationCard({
   }
 
   const emojiReserved = emoji ? 90 : 24;
-  const textX = avatarX + avatarSize + 24;
+  const textX = avatarX + avatarSize + 34;
   const maxTextWidth = WIDTH - textX - emojiReserved;
   ctx.textBaseline = 'alphabetic';
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = `32px "${FONT_FAMILY}"`;
-  ctx.fillText('Félicitations !', textX, 54, maxTextWidth);
+  ctx.font = `35px ${FONT_STACK}`;
+  ctx.fillText('Félicitations !', textX, 56, maxTextWidth);
 
   ctx.fillStyle = '#9ca3af';
-  ctx.font = `16px "${FONT_FAMILY}"`;
-  ctx.fillText(line1, textX, 80, maxTextWidth);
+  ctx.font = `17px ${FONT_STACK}`;
+  ctx.fillText(line1, textX, 82, maxTextWidth);
 
   ctx.fillStyle = accentColor;
-  ctx.font = `26px "${FONT_FAMILY}"`;
-  ctx.fillText(line2, textX, 112, maxTextWidth);
+  ctx.font = `29px ${FONT_STACK}`;
+  ctx.fillText(line2, textX, 116, maxTextWidth);
 
   if (emoji) {
     const emojiImage = await loadEmojiImage(emoji);

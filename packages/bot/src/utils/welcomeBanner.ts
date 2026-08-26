@@ -1,17 +1,8 @@
-import { createCanvas, GlobalFonts, loadImage, type SKRSContext2D } from '@napi-rs/canvas';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createCanvas, loadImage, type SKRSContext2D } from '@napi-rs/canvas';
+import { FONT_STACK } from './fonts.js';
 
-// Même dimensions que l'aperçu du dashboard (WelcomeConfigPage.tsx / BannerPreview).
-const WIDTH = 500;
-const HEIGHT = 150;
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FONT_FAMILY = 'Poppins ExtraBold';
-GlobalFonts.registerFromPath(
-  path.resolve(__dirname, '../../assets/fonts/Poppins-ExtraBold.ttf'),
-  FONT_FAMILY
-);
+const WIDTH = 525;
+const HEIGHT = 155;
 
 export interface WelcomeBannerOptions {
   kind: 'welcome' | 'goodbye';
@@ -64,7 +55,7 @@ export async function generateWelcomeBanner({
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
   }
 
-  const avatarSize = 112;
+  const avatarSize = 104;
   const avatarX = 28;
   const avatarY = (HEIGHT - avatarSize) / 2;
 
@@ -92,7 +83,7 @@ export async function generateWelcomeBanner({
     // Avatar injoignable : on continue sans (fond seul).
   }
 
-  const textX = avatarX + avatarSize + 20;
+  const textX = avatarX + avatarSize + 30;
   const maxTextWidth = WIDTH - textX - 20;
   ctx.textBaseline = 'alphabetic';
 
@@ -100,27 +91,28 @@ export async function generateWelcomeBanner({
   // positions Y fixes qui ne centraient rien, décalées vers le haut par
   // rapport à l'avatar) — chaque ligne est positionnée depuis sa propre
   // "boîte" (taille de police + interligne) plutôt qu'à la main.
-  const TITLE_SIZE = 38;
-  const SUBTITLE_SIZE = 18;
-  const NAME_SIZE = 36;
-  const GAP_TITLE_SUBTITLE = 4;
-  const GAP_SUBTITLE_NAME = 12;
+  // "Départ" (goodbye) est 5% plus petit qu'"Arrivée" (welcome).
+  const TITLE_SIZE = kind === 'goodbye' ? 42 : 44;
+  const SUBTITLE_SIZE = kind === 'goodbye' ? 20 : 21;
+  const NAME_SIZE = kind === 'goodbye' ? 40 : 42;
+  const GAP_TITLE_SUBTITLE = 5;
+  const GAP_SUBTITLE_NAME = 13;
   const ASCENT_RATIO = 0.8; // approximation ascendant/corps pour cette police.
 
   const blockHeight = TITLE_SIZE + GAP_TITLE_SUBTITLE + SUBTITLE_SIZE + GAP_SUBTITLE_NAME + NAME_SIZE;
   let cursorY = (HEIGHT - blockHeight) / 2;
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = `${TITLE_SIZE}px "${FONT_FAMILY}"`;
+  ctx.font = `${TITLE_SIZE}px ${FONT_STACK}`;
   ctx.fillText(kind === 'welcome' ? 'Bienvenue' : 'À bientôt', textX, cursorY + TITLE_SIZE * ASCENT_RATIO, maxTextWidth);
   cursorY += TITLE_SIZE + GAP_TITLE_SUBTITLE;
 
-  ctx.font = `${SUBTITLE_SIZE}px "${FONT_FAMILY}"`;
+  ctx.font = `${SUBTITLE_SIZE}px ${FONT_STACK}`;
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.fillText('sur le serveur Discord', textX, cursorY + SUBTITLE_SIZE * ASCENT_RATIO, maxTextWidth);
   cursorY += SUBTITLE_SIZE + GAP_SUBTITLE_NAME;
 
-  ctx.font = `${NAME_SIZE}px "${FONT_FAMILY}"`;
+  ctx.font = `${NAME_SIZE}px ${FONT_STACK}`;
   ctx.fillStyle = '#ffffff';
   ctx.fillText(guildName, textX, cursorY + NAME_SIZE * ASCENT_RATIO, maxTextWidth);
 

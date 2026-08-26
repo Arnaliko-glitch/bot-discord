@@ -4,7 +4,7 @@ import type { ServerTagConfig } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../client.js';
 import { generateCelebrationCard } from '../utils/celebrationCard.js';
 
-const ANNOUNCE_FALLBACK_ACCENT = '#ED4245';
+const ANNOUNCE_FALLBACK_ACCENT = '#dc2626';
 
 // Un membre affiche le "tag de serveur" (identité) de CE serveur si son
 // primaryGuild pointe dessus ET que l'affichage est activé — les deux

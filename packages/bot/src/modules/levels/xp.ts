@@ -6,7 +6,7 @@ import { levelForXp } from '@discord-bot-dashboard/shared';
 import { applyLevelRewards, applyPlaceholders, resolveAnnounceChannel } from './rewards.js';
 import { generateCelebrationCard } from '../../utils/celebrationCard.js';
 
-const LEVEL_UP_ACCENT = '#F0A020';
+export const LEVEL_UP_ACCENT = '#dc2626';
 
 // Ajoute de l'xp à un membre (message ou vocal — la source ne détermine que
 // le calcul du montant en amont), gère le passage de niveau, l'annonce et

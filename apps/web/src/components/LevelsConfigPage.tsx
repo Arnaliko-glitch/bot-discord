@@ -15,7 +15,7 @@ import { XpCurveChart } from '@/components/XpCurveChart';
 
 // Couleur fixe de l'embed de niveau — contrairement au module Bienvenue, ce
 // visuel n'est pas personnalisable (voir MessagePreview ci-dessous).
-const LEVEL_EMBED_COLOR = '#F0A020';
+const LEVEL_EMBED_COLOR = '#dc2626';
 
 // Même police (Poppins ExtraBold) que les cartes de niveau/récompense
 // générées côté bot (packages/bot/src/utils/celebrationCard.ts, rankCard.ts)
@@ -397,12 +397,12 @@ function MessagePreview({
 
       <div className="flex overflow-hidden rounded">
         <div className="w-1 shrink-0" style={{ backgroundColor: LEVEL_EMBED_COLOR }} />
-        <div className="flex min-w-0 flex-1 items-center gap-3 bg-[#2b2d31] p-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 bg-[#1a1d23] p-3">
           <img
             src={avatarUrl}
             alt=""
             className="h-14 w-14 shrink-0 rounded-full ring-2"
-            style={{ boxShadow: `0 0 0 2px ${LEVEL_EMBED_COLOR}` }}
+            style={{ boxShadow: '0 0 0 2px #ffffff' }}
           />
           <div className={`min-w-0 ${cardFont.className}`}>
             <p className="text-lg font-bold text-white">Félicitations !</p>
@@ -419,7 +419,7 @@ function MessagePreview({
 
 // Couleur fixe de l'embed de récompense — comme pour le level-up, ce visuel
 // n'est pas personnalisable.
-const REWARD_EMBED_COLOR = '#ED4245';
+const REWARD_EMBED_COLOR = '#dc2626';
 
 // Même principe que MessagePreview (level-up), mais pour l'annonce de
 // récompense — le rôle affiché est purement illustratif ici.
@@ -476,13 +476,13 @@ function RewardMessagePreview({
 
       <div className="flex overflow-hidden rounded">
         <div className="w-1 shrink-0" style={{ backgroundColor: REWARD_EMBED_COLOR }} />
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#2b2d31] p-3">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-[#1a1d23] p-3">
           <div className="flex min-w-0 items-center gap-3">
             <img
               src={avatarUrl}
               alt=""
               className="h-14 w-14 shrink-0 rounded-full"
-              style={{ boxShadow: `0 0 0 2px ${REWARD_EMBED_COLOR}` }}
+              style={{ boxShadow: '0 0 0 2px #ffffff' }}
             />
             <div className={`min-w-0 ${cardFont.className}`}>
               <p className="text-lg font-bold text-white">Félicitations !</p>

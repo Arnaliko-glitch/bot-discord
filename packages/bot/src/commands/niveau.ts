@@ -1,4 +1,6 @@
 import {
+  AttachmentBuilder,
+  EmbedBuilder,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -7,7 +9,7 @@ import {
 import { prisma } from '@discord-bot-dashboard/database';
 import type { SlashCommand } from './types.js';
 import { levelForXp, levelProgress } from '@discord-bot-dashboard/shared';
-import { generateRankCard } from '../utils/rankCard.js';
+import { ACCENT, generateRankCard } from '../utils/rankCard.js';
 
 const DEFAULT_CURVE_STYLE = 'exponential';
 const DEFAULT_CURVE_MULTIPLIER = 1;
@@ -77,6 +79,8 @@ export const niveauCommand: SlashCommand = {
       xpForNextLevel,
     });
 
-    await interaction.editReply({ files: [{ attachment: card, name: 'rank.png' }] });
+    const attachment = new AttachmentBuilder(card, { name: 'rank.png' });
+    const embed = new EmbedBuilder().setColor(ACCENT).setImage('attachment://rank.png');
+    await interaction.editReply({ embeds: [embed], files: [attachment] });
   },
 };

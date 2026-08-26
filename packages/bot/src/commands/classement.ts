@@ -91,7 +91,7 @@ export const classementCommand: SlashCommand = {
     const leaderboardUrl = appUrl && settings.publicLeaderboardEnabled ? `${appUrl}/leaderboard/${guild.id}` : null;
 
     const embed = new EmbedBuilder()
-      .setColor(0xf0a020)
+      .setColor(0xdc2626)
       .setTitle(`🏆 Classement de niveaux de : ${guild.name}`)
       .setThumbnail(guild.iconURL())
       // Une ligne vide "pure" est trim/collapsée par le rendu Discord — un

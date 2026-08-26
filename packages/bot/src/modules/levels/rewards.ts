@@ -4,7 +4,7 @@ import { prisma } from '@discord-bot-dashboard/database';
 import type { LevelRole, XpSettings } from '@discord-bot-dashboard/database';
 import { generateCelebrationCard } from '../../utils/celebrationCard.js';
 
-const REWARD_FALLBACK_ACCENT = '#ED4245';
+export const REWARD_FALLBACK_ACCENT = '#dc2626';
 
 function applyPlaceholders(template: string, member: GuildMember, level: number) {
   return template

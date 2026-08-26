@@ -1,14 +1,12 @@
-import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { FONT_STACK, fontStackFor } from './fonts.js';
 
-const WIDTH = 600;
-const HEIGHT = 160;
-const ACCENT = '#f0a020';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FONT_FAMILY = 'Poppins ExtraBold';
-GlobalFonts.registerFromPath(path.resolve(__dirname, '../../assets/fonts/Poppins-ExtraBold.ttf'), FONT_FAMILY);
+// Mêmes dimensions que les autres cartes générées (bienvenue/départ,
+// célébration) pour un rendu de taille cohérente une fois réduites à la
+// largeur d'affichage d'un embed Discord.
+const WIDTH = 525;
+const HEIGHT = 155;
+export const ACCENT = '#dc2626';
 
 export interface RankCardOptions {
   avatarUrl: string;
@@ -35,14 +33,14 @@ export async function generateRankCard({
   ctx.fillStyle = '#1a1d23';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  const avatarSize = 96;
-  const avatarX = 32;
+  const avatarSize = 104;
+  const avatarX = 28;
   const avatarY = (HEIGHT - avatarSize) / 2;
   ctx.save();
   ctx.beginPath();
   ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2 + 4, 0, Math.PI * 2);
   ctx.closePath();
-  ctx.fillStyle = ACCENT;
+  ctx.fillStyle = '#ffffff';
   ctx.fill();
   ctx.restore();
 
@@ -59,22 +57,30 @@ export async function generateRankCard({
     // Avatar injoignable : on continue sans (fond seul).
   }
 
-  const textX = avatarX + avatarSize + 28;
-  const rightEdge = WIDTH - 32;
+  const textX = avatarX + avatarSize + 34;
+  const rightEdge = WIDTH - 28;
 
   ctx.textBaseline = 'alphabetic';
+
+  // Largeur réelle du compteur xp mesurée avant de dessiner le pseudo, pour
+  // ne réserver que l'espace qu'il occupe vraiment (un pseudo long ne doit
+  // pas pouvoir chevaucher un petit compteur, ni l'inverse).
+  const xpText = `${xpIntoLevel} / ${xpForNextLevel}`;
+  ctx.font = `23px ${FONT_STACK}`;
+  const xpTextWidth = ctx.measureText(xpText).width;
+
   ctx.fillStyle = '#ffffff';
-  ctx.font = `28px "${FONT_FAMILY}"`;
-  ctx.fillText(username, textX, 56, rightEdge - textX - 110);
+  ctx.font = `32px ${fontStackFor(username)}`;
+  ctx.fillText(username, textX, 46, rightEdge - textX - xpTextWidth - 20);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffffff';
-  ctx.font = `20px "${FONT_FAMILY}"`;
-  ctx.fillText(`${xpIntoLevel} / ${xpForNextLevel}`, rightEdge, 44);
+  ctx.font = `23px ${FONT_STACK}`;
+  ctx.fillText(xpText, rightEdge, 45);
   ctx.textAlign = 'left';
 
   const barX = textX;
-  const barY = 74;
+  const barY = 66;
   const barWidth = rightEdge - textX;
   const barHeight = 12;
   const radius = barHeight / 2;
@@ -90,16 +96,16 @@ export async function generateRankCard({
   ctx.fill();
 
   ctx.fillStyle = '#9ca3af';
-  ctx.font = `16px "${FONT_FAMILY}"`;
-  ctx.fillText('Place', textX, HEIGHT - 34);
+  ctx.font = `18px ${FONT_STACK}`;
+  ctx.fillText('Place', textX, HEIGHT - 42);
   ctx.fillStyle = '#ffffff';
-  ctx.font = `22px "${FONT_FAMILY}"`;
-  ctx.fillText(String(place), textX, HEIGHT - 12);
+  ctx.font = `25px ${FONT_STACK}`;
+  ctx.fillText(String(place), textX, HEIGHT - 18);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = ACCENT;
-  ctx.font = `26px "${FONT_FAMILY}"`;
-  ctx.fillText(`Niveau ${level}`, rightEdge, HEIGHT - 18);
+  ctx.font = `30px ${FONT_STACK}`;
+  ctx.fillText(`Niveau ${level}`, rightEdge, HEIGHT - 20);
   ctx.textAlign = 'left';
 
   return canvas.toBuffer('image/png');
