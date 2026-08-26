@@ -14,8 +14,9 @@ Monorepo pnpm : tableau de bord web (Next.js) + bot Discord (discord.js), config
 - **Messages** — composeur de messages interactifs : contenu, embeds multiples (auteur + icône, titre cliquable, champs, footer + icône, vignette et image), galerie d'images autonome, boutons (ouvrir un ticket ou rediriger vers un lien), aperçu fidèle au rendu Discord, brouillons.
 - **Rôles-réactions** — panneaux où réagir avec un emoji donne un rôle (et le retire au retrait de la réaction) ; contenu, image et/ou embed au choix, synchronisation automatique des réactions à chaque republication.
 - **Tickets** — création via bouton ou `/panel-ticket`, validation/refus, fermeture et réouverture avec motif, suppression automatique optionnelle quand un membre du staff ferme le ticket.
+- **Salons privés** — salon "hub" qui crée un salon vocal temporaire à la jonction (façon DraftBot), avec panneau de boutons dans le salon créé (fermer/ouvrir, privé, renommer, limite, purge, transfert/réquisition, listes blanche/noire), permissions de création configurables (catégorie ou salon hub, droits Discord du propriétaire), rôles modérateurs et intouchables, nettoyage automatique des salons vides et orphelins.
 - **Tag du serveur** — attribue automatiquement un rôle aux membres qui affichent le tag ("identité de serveur") de ce serveur sur leur profil Discord.
-- **Logs** — salon de logs pour les événements du tag du serveur (ajout/retrait), catégories supplémentaires à venir.
+- **Logs** — salon de logs pour les événements du tag du serveur (ajout/retrait), catégories supplémentaires à venir ; salons de statistiques (vocaux ou textuels, créés depuis le dashboard) renommés périodiquement pour afficher le nombre de membres du serveur.
 - **Accueil** — nombre de membres et graphique de variation nette (arrivées/départs) sur 30/60/90 jours, résumé `/statistiques` en salon.
 
 ## Développement local
