@@ -21,9 +21,12 @@ model Guild {
   LevelRole          LevelRole[]
   TemporaryRoleGrant TemporaryRoleGrant[]
   LogsConfig         LogsConfig?
+  PrivateRoom        PrivateRoom[]
+  PrivateRoomConfig  PrivateRoomConfig?
   ReactionRolePanel  ReactionRolePanel[]
   SavedMessage       SavedMessage[]
   ServerTagConfig    ServerTagConfig?
+  StatsChannel       StatsChannel[]
   Ticket             Ticket[]
   TicketConfig       TicketConfig?
   TicketRequest      TicketRequest[]
@@ -164,6 +167,73 @@ model TicketConfig {
   Guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
+// Salon vocal "hub" — rejoindre ce salon crée automatiquement un salon
+// temporaire dont le créateur devient propriétaire (voir PrivateRoom), façon
+// DraftBot. `categoryId` vide = crée dans la même catégorie que le hub.
+model PrivateRoomConfig {
+  id           String   @id
+  guildId      String   @unique
+  enabled      Boolean  @default(false)
+  hubChannelId String?
+  categoryId   String?
+  nameTemplate String   @default("🔊 Salon de {user}")
+  // 0 = illimité, comme le "User Limit" natif d'un salon vocal Discord.
+  userLimit    Int      @default(0)
+  // "category" = le salon créé hérite des permissions de sa catégorie
+  // (comportement Discord par défaut) ; "hub" = il copie plutôt les
+  // permissions du salon de création lui-même.
+  permissionSource String @default("category")
+  // Permissions Discord données au créateur sur son propre salon (en plus
+  // des droits qu'il a déjà par ses rôles) — voir applyCreatorPermissions
+  // dans privateRooms.ts pour le détail de chaque flag.
+  creatorCanInvite         Boolean  @default(true)
+  creatorPrioritySpeaker   Boolean  @default(true)
+  creatorSetStatus         Boolean  @default(true)
+  creatorManageChannel     Boolean  @default(false)
+  creatorUseSoundboard     Boolean  @default(true)
+  creatorManagePermissions Boolean  @default(false)
+  // Un membre encore présent peut réclamer la propriété d'un salon dont le
+  // créateur est parti, via le bouton "Transfert" du menu.
+  allowClaim         Boolean  @default(true)
+  // Poste un message avec des boutons (Ouvrir/Fermer, Privé, Renommer,
+  // Limite, Purge, Transfert, Liste blanche/noire) dans chaque salon créé.
+  configMenuEnabled  Boolean  @default(true)
+  // Rôles qui peuvent utiliser le menu sur N'IMPORTE QUEL salon temporaire,
+  // pas seulement le leur.
+  moderatorRoleIds   String[] @default([])
+  // Rôles qui ne peuvent jamais être expulsés/mis en liste noire (Purge,
+  // bouton Liste noire les ignorent).
+  untouchableRoleIds String[] @default([])
+  // Rôles autorisés à rejoindre un salon par défaut (mode "ouvert") — vide
+  // = tout le monde (@everyone), comme le reste du projet pour ce genre de liste.
+  accessRoleIds      String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  Guild        Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+// Un salon vocal temporaire actuellement suivi — sert à savoir qui en est le
+// propriétaire (permissions données à la création), son mode d'accès actuel,
+// et à le supprimer dès qu'il se vide (y compris pour rattraper les
+// orphelins si le bot a redémarré pendant qu'un salon existait).
+model PrivateRoom {
+  id        String   @id
+  guildId   String
+  channelId String   @unique
+  ownerId   String
+  // "open" (rôles d'accès de base), "closed" (personne de nouveau ne peut
+  // rejoindre), "private" (invisible pour les non-membres), "whitelist"
+  // (seuls whitelistUserIds + le propriétaire), "blacklist" (tout le monde
+  // sauf blacklistUserIds).
+  mode            String   @default("open")
+  whitelistUserIds String[] @default([])
+  blacklistUserIds String[] @default([])
+  createdAt DateTime @default(now())
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
 model TicketRequest {
   id                  String   @id
   guildId             String
@@ -285,6 +355,28 @@ model LogsConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   Guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+// Un salon créé par le bot et renommé périodiquement pour afficher une
+// statistique du serveur (ex: "Membres : 1234") — {count} dans `format` est
+// remplacé par la valeur de `statType` à chaque mise à jour. Contrairement
+// au reste du module Logs, le salon lui-même est créé/supprimé par le
+// dashboard (pas juste sélectionné parmi des salons existants).
+model StatsChannel {
+  id          String   @id
+  guildId     String
+  channelId   String   @unique
+  // "membersNoBots" | "membersTotal" — la liste des statistiques calculables
+  // par le bot, amenée à s'étendre (voir packages/bot/src/modules/statsChannels.ts).
+  statType    String
+  // "voice" | "text" — un salon vocal créé ici est verrouillé (connexion
+  // refusée à @everyone) puisqu'il ne sert qu'à afficher son nom.
+  channelType String   @default("voice")
+  format      String   @default("Membres : {count}")
+  createdAt   DateTime @default(now())
+  Guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
 }
 
 // Un panneau "rôles-réactions" : un message (posté ou attaché à un message

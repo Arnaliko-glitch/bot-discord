@@ -213,23 +213,18 @@ export function ServerTagConfigPage({
 
   return (
     <div className="space-y-8 pb-24">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Tag du serveur</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Attribue automatiquement un rôle aux membres qui affichent le tag de ce serveur sur leur profil Discord — le
-          rôle est retiré dès qu&apos;ils le retirent.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Tag du serveur</h1>
+          <p className="text-sm text-gray-500">
+            Attribue automatiquement un rôle aux membres qui affichent le tag de ce serveur sur leur profil Discord — le
+            rôle est retiré dès qu&apos;ils le retirent.
+          </p>
+        </div>
+        <Toggle checked={config.enabled} onChange={(v) => update('enabled', v)} />
       </div>
 
       <div className="card space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold text-white">Activer</h2>
-            <p className="text-xs text-gray-500">Rien ne se passe tant que ce module est désactivé.</p>
-          </div>
-          <Toggle checked={config.enabled} onChange={(v) => update('enabled', v)} />
-        </div>
-
         <div>
           <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
             Rôle à attribuer

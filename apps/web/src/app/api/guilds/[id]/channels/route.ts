@@ -14,6 +14,9 @@ interface DiscordChannel {
 const TEXT_CHANNEL_TYPES = new Set([0, 5]);
 // GUILD_CATEGORY
 const CATEGORY_CHANNEL_TYPES = new Set([4]);
+// GUILD_VOICE (pas GUILD_STAGE_VOICE : on ne crée pas de salons temporaires
+// dans un salon de conférence).
+const VOICE_CHANNEL_TYPES = new Set([2]);
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
@@ -32,7 +35,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!res.ok) return NextResponse.json({ error: 'Impossible de récupérer les salons' }, { status: 502 });
 
   const type = request.nextUrl.searchParams.get('type');
-  const allowedTypes = type === 'category' ? CATEGORY_CHANNEL_TYPES : TEXT_CHANNEL_TYPES;
+  const allowedTypes =
+    type === 'category' ? CATEGORY_CHANNEL_TYPES : type === 'voice' ? VOICE_CHANNEL_TYPES : TEXT_CHANNEL_TYPES;
 
   const channels = (await res.json()) as DiscordChannel[];
   const filtered = channels

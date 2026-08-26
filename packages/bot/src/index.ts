@@ -11,6 +11,7 @@ import { prisma } from '@discord-bot-dashboard/database';
 import type { BotModuleHandler } from './client.js';
 import { welcomeModule } from './modules/welcome/index.js';
 import { memberStatsModule } from './modules/memberStats.js';
+import { statsChannelsModule } from './modules/statsChannels.js';
 import { serverTagModule } from './modules/serverTag.js';
 import { messageXpModule as baseMessageXpModule } from './modules/levels/messageXp.js';
 import { voiceXpModule } from './modules/levels/voiceXp.js';
@@ -20,6 +21,8 @@ import { commands } from './commands/index.js';
 import { handleTicketInteraction } from './modules/tickets/interactions.js';
 import { startPresenceRotation } from './modules/presence.js';
 import { reactionRolesModule } from './modules/reactionRoles/index.js';
+import { privateRoomsModule } from './modules/privateRooms/index.js';
+import { handlePrivateRoomInteraction } from './modules/privateRooms/interactions.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
@@ -77,8 +80,10 @@ const modules: BotModuleHandler[] = [
   welcomeModule,
   messageXpModule,
   memberStatsModule,
+  statsChannelsModule,
   serverTagModule,
   reactionRolesModule,
+  privateRoomsModule,
 ];
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -93,6 +98,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.deferred || interaction.replied) await interaction.editReply({ content }).catch(() => undefined);
       else await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);
     }
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('privateroom:')) {
+    await handlePrivateRoomInteraction(interaction).catch((err) => console.error('Interaction salon privé échouée:', err));
+    return;
+  }
+  if (interaction.isModalSubmit() && interaction.customId.startsWith('privateroom-modal:')) {
+    await handlePrivateRoomInteraction(interaction).catch((err) => console.error('Interaction salon privé échouée:', err));
+    return;
+  }
+  if (interaction.isUserSelectMenu() && interaction.customId.startsWith('privateroom-select:')) {
+    await handlePrivateRoomInteraction(interaction).catch((err) => console.error('Interaction salon privé échouée:', err));
     return;
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChannelSelect, type Channel } from '@/components/ChannelSelect';
+import { StatsChannelsSection } from '@/components/StatsChannelsSection';
 import { useUnsavedChanges } from '@/lib/unsaved-changes-context';
 
 export interface LogsConfigData {
@@ -104,6 +105,8 @@ export function LogsConfigPage({
           Choisissez dans quel salon envoyer les journaux d&apos;événements du bot, catégorie par catégorie.
         </p>
       </div>
+
+      <StatsChannelsSection guildId={guildId} />
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="card space-y-3">

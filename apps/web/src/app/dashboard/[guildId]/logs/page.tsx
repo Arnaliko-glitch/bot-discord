@@ -9,7 +9,11 @@ export default async function LogsPage({ params }: { params: { guildId: string }
       guildId={params.guildId}
       initial={
         config
-          ? { tagChannelId: config.tagChannelId, tagLogAdded: config.tagLogAdded, tagLogRemoved: config.tagLogRemoved }
+          ? {
+              tagChannelId: config.tagChannelId,
+              tagLogAdded: config.tagLogAdded,
+              tagLogRemoved: config.tagLogRemoved,
+            }
           : undefined
       }
     />
