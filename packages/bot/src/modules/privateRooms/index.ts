@@ -20,6 +20,23 @@ async function createRoomFor(guild: Guild, member: GuildMember, config: PrivateR
   creating.add(lockKey);
 
   try {
+    // Un membre déjà propriétaire d'un salon actif est redéplacé dedans au
+    // lieu d'en recréer un — évite un flood de salons/panneaux si son client
+    // rejoint le hub plusieurs fois de suite (reco réseau, redémarrage du
+    // bot en dev pendant qu'une vieille connexion vocale traîne, etc.).
+    const existingRoom = await prisma.privateRoom.findFirst({ where: { guildId: guild.id, ownerId: member.id } });
+    if (existingRoom) {
+      const existingChannel =
+        guild.channels.cache.get(existingRoom.channelId) ?? (await guild.channels.fetch(existingRoom.channelId).catch(() => null));
+      if (existingChannel?.type === ChannelType.GuildVoice) {
+        await member.voice.setChannel(existingChannel).catch((err) => console.error('Déplacement vers le salon privé échoué:', err));
+        return;
+      }
+      // Le salon n'existe plus (supprimé manuellement) : ligne orpheline,
+      // on la nettoie avant de continuer vers une vraie création.
+      await prisma.privateRoom.delete({ where: { id: existingRoom.id } }).catch(() => undefined);
+    }
+
     // `parent` seul suffit à faire hériter les permissions de la catégorie
     // (comportement natif de l'API Discord dès qu'aucun `permissionOverwrites`
     // n'est passé à la création) — la base pour "category" comme pour "hub",

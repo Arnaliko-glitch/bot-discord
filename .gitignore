@@ -13,3 +13,4 @@ coverage/
 apps/web/public/uploads/
 packages/database/generated/
 .claude/
+backups/

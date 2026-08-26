@@ -1,0 +1,6 @@
+# Toujours des fins de ligne LF pour les scripts shell/Docker, peu importe
+# la config git de la machine qui checkout (ex: core.autocrlf=true sous
+# Windows) — un \r dans un script shell exécuté dans un conteneur Linux
+# (voir scripts/backup-db.sh, Dockerfile) le casse silencieusement.
+*.sh text eol=lf
+Dockerfile text eol=lf

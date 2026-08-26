@@ -62,3 +62,13 @@ git pull
 docker compose up -d --build
 docker compose run --rm migrate
 ```
+
+### Sauvegardes
+
+Le service `backup` fait un `pg_dump` complet une fois par jour à heure fixe (`BACKUP_HOUR`, 3h UTC par défaut), sans action manuelle — démarre automatiquement avec `docker compose up -d`, un fichier compressé dans `./backups` sur l'hôte (ex: `discord_dashboard_2026-08-26_03-00-00.sql.gz`), les sauvegardes de plus de `BACKUP_RETENTION_DAYS` jours (7 par défaut) sont supprimées automatiquement.
+
+Pour restaurer une sauvegarde :
+
+```bash
+gunzip -c backups/discord_dashboard_AAAA-MM-JJ_HH-MM-SS.sql.gz | docker compose exec -T postgres psql -U ${POSTGRES_USER:-discord_dashboard} -d ${POSTGRES_DB:-discord_dashboard}
+```

@@ -44,6 +44,28 @@ services:
       postgres:
         condition: service_healthy
 
+  # Sauvegarde pg_dump quotidienne à heure fixe (boucle interne, voir
+  # scripts/backup-db.sh) — un fichier .sql.gz par jour dans ./backups sur
+  # l'hôte, conservés BACKUP_RETENTION_DAYS jours (7 par défaut) puis
+  # supprimés automatiquement.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-discord_dashboard}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-discord_dashboard}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-db.sh:/backup-db.sh:ro
+    entrypoint: ['/bin/sh', '/backup-db.sh']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Applique le schéma Prisma à la base — ne démarre jamais avec `docker
   # compose up` (profil dédié), à lancer manuellement : voir README.
   migrate:
