@@ -13,12 +13,17 @@ import { testCardsCommand } from './testCards.js';
 const devCommands: SlashCommand[] =
   process.env.NODE_ENV === 'production'
     ? []
-    : [testTagLogCommand, testAddXpCommand, testTagAnnounceCommand, testCardsCommand];
+    : [
+        panelTicketCommand,
+        testTagLogCommand,
+        testAddXpCommand,
+        testTagAnnounceCommand,
+        testCardsCommand,
+      ];
 
 export const commands: SlashCommand[] = [
   niveauCommand,
   classementCommand,
-  panelTicketCommand,
   statistiquesCommand,
   ...devCommands,
 ];
