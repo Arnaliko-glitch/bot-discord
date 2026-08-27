@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder, Events, type Guild, type GuildMember, type PartialUser, type User } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder, Events, type Guild, type GuildMember, type User } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { ServerTagConfig } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../client.js';
@@ -10,7 +10,7 @@ const ANNOUNCE_FALLBACK_ACCENT = '#dc2626';
 // primaryGuild pointe dessus ET que l'affichage est activé — les deux
 // conditions peuvent changer indépendamment (ex: garder identityGuildId mais
 // désactiver l'affichage).
-function displaysTagFor(user: User | PartialUser, guildId: string): boolean {
+function displaysTagFor(user: User, guildId: string): boolean {
   return user.primaryGuild?.identityGuildId === guildId && user.primaryGuild.identityEnabled === true;
 }
 
@@ -102,28 +102,15 @@ async function applyTagRoleState(guild: Guild, member: GuildMember, config: Serv
   }
 }
 
-async function syncTagRole(client: BotClient, oldUser: User | PartialUser, newUser: User) {
-  // Seules les guildes concernées par le changement (avant et/ou après)
-  // peuvent avoir un rôle à ajouter/retirer — inutile de vérifier les autres.
-  const relevantGuildIds = new Set(
-    [oldUser.primaryGuild?.identityGuildId, newUser.primaryGuild?.identityGuildId].filter(
-      (id): id is string => Boolean(id)
-    )
-  );
-  if (relevantGuildIds.size === 0) return;
-
-  for (const guildId of relevantGuildIds) {
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) continue;
-
-    const config = await prisma.serverTagConfig.findUnique({ where: { guildId } });
-    if (!config?.enabled || !config.roleId) continue;
-
-    const member = guild.members.cache.get(newUser.id) ?? (await guild.members.fetch(newUser.id).catch(() => null));
-    if (!member) continue;
-
-    await applyTagRoleState(guild, member, config, true);
-  }
+// Discord n'envoie l'événement USER_UPDATE que pour l'utilisateur du bot
+// lui-même — les changements sur le profil des AUTRES membres (dont
+// primaryGuild, le tag de serveur) remontent via GUILD_MEMBER_UPDATE à la
+// place (déjà reçu grâce à l'intent GuildMembers), pas besoin d'écouter
+// UserUpdate qui ne se déclenchait donc jamais pour ce cas.
+async function handleMemberUpdate(member: GuildMember) {
+  const config = await prisma.serverTagConfig.findUnique({ where: { guildId: member.guild.id } });
+  if (!config?.enabled || !config.roleId) return;
+  await applyTagRoleState(member.guild, member, config, true);
 }
 
 // Repasse sur tous les membres d'une guilde pour rattraper les cas ratés par
@@ -150,14 +137,13 @@ async function syncGuildTagRoles(guild: Guild) {
 }
 
 // Donne/retire un rôle selon que le membre affiche ou non le tag de CE
-// serveur sur son profil Discord — discord.js relaie ce changement via
-// l'événement UserUpdate (déclenché par les mises à jour de membre déjà
-// reçues avec l'intent GuildMembers, pas besoin d'intent supplémentaire).
+// serveur sur son profil Discord.
 export const serverTagModule: BotModuleHandler = {
   name: 'serverTag',
   register(client: BotClient) {
-    client.on(Events.UserUpdate, (oldUser, newUser) => {
-      syncTagRole(client, oldUser, newUser).catch((err) => console.error('serverTag module failed:', err));
+    client.on(Events.GuildMemberUpdate, (_oldMember, newMember) => {
+      if (newMember.user.bot) return;
+      handleMemberUpdate(newMember).catch((err) => console.error('serverTag module failed:', err));
     });
 
     // GuildCreate couvre à la fois un nouvel ajout du bot ET le rechargement
