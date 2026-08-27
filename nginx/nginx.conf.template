@@ -1,0 +1,46 @@
+# Reverse proxy HTTPS vers le dashboard (le bot n'a pas de port HTTP à
+# exposer, il ne fait que se connecter en sortant vers l'API Discord).
+# ${DOMAIN} est substitué au démarrage du conteneur par l'image nginx
+# officielle (fichiers *.template dans /etc/nginx/templates/, mécanisme
+# intégré depuis nginx 1.19 — n'interfère pas avec les vraies variables
+# nginx comme $host, seules les variables d'environnement réellement
+# définies sont remplacées).
+#
+# Suppose qu'un certificat existe déjà dans le volume certbot_conf pour ce
+# domaine (voir README, section Déploiement — bootstrap HTTPS en une fois
+# avant le tout premier démarrage). Le service `certbot` du docker-compose
+# se charge ensuite du renouvellement automatique.
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN};
+
+    client_max_body_size 10m;
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://web:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}

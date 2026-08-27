@@ -34,26 +34,42 @@ Le dashboard tourne sur `http://localhost:3000`.
 
 ## Déploiement (Docker Compose)
 
-Prérequis : Docker + Docker Compose sur le serveur.
+Prérequis : Docker + Docker Compose sur le serveur, un nom de domaine qui pointe vers son IP (un sous-domaine gratuit type `<ip-avec-tirets>.sslip.io` fonctionne très bien, aucun DNS à configurer).
 
 ```bash
-cp .env.example .env   # puis renseigner les valeurs (voir ci-dessous)
-docker compose up -d --build
+cp .env.example .env   # puis renseigner les valeurs (voir ci-dessous), y compris DOMAIN
 ```
 
-Au premier lancement, applique le schéma à la base (le service `postgres` doit être démarré) :
+### Bootstrap HTTPS (une seule fois, avant le tout premier démarrage)
+
+`nginx` a besoin qu'un certificat existe déjà pour démarrer (son bloc HTTPS le référence directement) — on l'obtient donc une première fois en mode autonome, port 80 libre, avant de lancer le reste de la stack :
 
 ```bash
+docker run -it --rm -p 80:80 \
+  -v discord-bot-dashboard_certbot_conf:/etc/letsencrypt \
+  certbot/certbot certonly --standalone \
+  -d "$DOMAIN" --agree-tos -m ton-email@example.com --non-interactive
+```
+
+(remplace `discord-bot-dashboard_` par le nom réel du dossier du projet si différent — Docker Compose préfixe les volumes avec le nom du répertoire ; `docker volume ls` pour vérifier le nom exact si besoin).
+
+### Premier démarrage
+
+```bash
+docker compose up -d --build
 docker compose run --rm migrate
 ```
+
+Le service `certbot` de la stack prend ensuite le relais tout seul pour le renouvellement (vérifie deux fois par jour, ne renouvelle réellement que dans les ~30 jours avant expiration) — plus rien à faire manuellement après ce premier bootstrap.
 
 ### Variables d'environnement
 
 Voir `.env.example` pour la liste complète et leur usage. Points d'attention :
 
+- `DOMAIN` (sans `https://` ni chemin), `DISCORD_REDIRECT_URI` et `NEXT_PUBLIC_APP_URL` doivent tous les trois pointer vers le même domaine, en HTTPS.
 - `DISCORD_REDIRECT_URI` doit correspondre exactement à l'URL de callback OAuth enregistrée dans le [portail développeur Discord](https://discord.com/developers/applications) de ton application.
 - `DATABASE_URL` n'a pas besoin d'être ajustée pour Docker Compose : `docker-compose.yml` la reconstruit automatiquement à partir de `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` pour pointer vers le service `postgres`. Elle n'est utilisée telle quelle qu'en développement local (`pnpm dev`).
-- `nginx/nginx.conf` fait un reverse proxy simple vers le dashboard sur le port `NGINX_PORT` (80 par défaut) — adapte `server_name` à ton domaine et ajoute un bloc HTTPS (ex: certbot) si besoin.
+- `nginx/nginx.conf.template` fait un reverse proxy HTTPS vers le dashboard (port 80 redirigé vers 443) — `${DOMAIN}` y est substitué automatiquement au démarrage du conteneur.
 
 ### Mettre à jour un déploiement existant
 

@@ -4,3 +4,4 @@
 # (voir scripts/backup-db.sh, Dockerfile) le casse silencieusement.
 *.sh text eol=lf
 Dockerfile text eol=lf
+nginx/*.template text eol=lf
