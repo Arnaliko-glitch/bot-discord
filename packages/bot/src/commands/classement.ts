@@ -84,7 +84,7 @@ export const classementCommand: SlashCommand = {
     const lines = entries.map((entry, i) => {
       const rank = MEDALS[i] ?? `**${i + 1}.**`;
       const handle = entry.handle ? ` \`@${entry.handle}\`` : '';
-      return `${rank} **${entry.username}**${handle}\n└ Niveau ${entry.level} • ${entry.xp} XP`;
+      return `${rank} **${entry.username}**${handle}\n└ Niveau ${entry.level} (${entry.xp} XP)`;
     });
 
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
