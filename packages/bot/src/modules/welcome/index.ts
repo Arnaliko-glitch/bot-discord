@@ -1,7 +1,7 @@
 import { AttachmentBuilder, EmbedBuilder, Events, type GuildMember } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../../client.js';
-import { generateWelcomeBanner } from '../../utils/welcomeBanner.js';
+import { generateWelcomeBanner, resolveBackgroundImageUrl } from '../../utils/welcomeBanner.js';
 
 // `userAsMention` ne veut PAS dire "notifier le membre" — une mention dans
 // une description d'embed ne ping personne, elle s'affiche juste en bleu.
@@ -58,16 +58,7 @@ async function handleJoinOrLeave(member: GuildMember, kind: 'welcome' | 'goodbye
   if (!channel?.isTextBased()) return;
 
   const backgroundImagePath = kind === 'welcome' ? config.backgroundImage : config.goodbyeBackgroundImage;
-  // Chemin relatif (/uploads/...) stocké par le dashboard : le bot tourne
-  // dans un process séparé, il lui faut l'URL complète du serveur web pour aller la charger.
-  // Une URL externe collée directement dans le dashboard est déjà absolue —
-  // on ne la préfixe pas, sinon on obtient une URL invalide.
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-  const backgroundImage = !backgroundImagePath
-    ? null
-    : /^https?:\/\//i.test(backgroundImagePath)
-      ? backgroundImagePath
-      : `${appUrl}${backgroundImagePath}`;
+  const backgroundImage = resolveBackgroundImageUrl(backgroundImagePath);
 
   const banner = await generateWelcomeBanner({
     kind,

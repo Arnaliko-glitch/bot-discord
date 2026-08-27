@@ -6,8 +6,9 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from 'discord.js';
+import { prisma } from '@discord-bot-dashboard/database';
 import type { SlashCommand } from './types.js';
-import { generateWelcomeBanner } from '../utils/welcomeBanner.js';
+import { generateWelcomeBanner, resolveBackgroundImageUrl } from '../utils/welcomeBanner.js';
 import { generateCelebrationCard } from '../utils/celebrationCard.js';
 import { generateRankCard } from '../utils/rankCard.js';
 import { LEVEL_UP_ACCENT } from '../modules/levels/xp.js';
@@ -40,9 +41,33 @@ export const testCardsCommand: SlashCommand = {
     const rewardAccent = sampleRole?.color ? sampleRole.hexColor : REWARD_FALLBACK_ACCENT;
     const rewardRoleName = sampleRole?.name ?? 'Rôle exemple';
 
+    // Reflète le fond réellement configuré (image/couleur/calque) au lieu du
+    // dégradé par défaut, comme le vrai message d'arrivée/départ — lancée en
+    // amont du Promise.all pour se superposer aux 4 générateurs qui n'en ont
+    // pas besoin plutôt que de tous les faire attendre cette requête DB.
+    const welcomeConfigPromise = prisma.welcomeConfig.findUnique({ where: { guildId: guild.id } });
+
     const [welcome, goodbye, levelUp, levelReward, tagReward, rank] = await Promise.all([
-      generateWelcomeBanner({ kind: 'welcome', avatarUrl, guildName: guild.name }),
-      generateWelcomeBanner({ kind: 'goodbye', avatarUrl, guildName: guild.name }),
+      welcomeConfigPromise.then((welcomeConfig) =>
+        generateWelcomeBanner({
+          kind: 'welcome',
+          avatarUrl,
+          guildName: guild.name,
+          backgroundImage: resolveBackgroundImageUrl(welcomeConfig?.backgroundImage),
+          backgroundColor: welcomeConfig?.backgroundColor,
+          backgroundOverlay: welcomeConfig?.backgroundOverlay,
+        })
+      ),
+      welcomeConfigPromise.then((welcomeConfig) =>
+        generateWelcomeBanner({
+          kind: 'goodbye',
+          avatarUrl,
+          guildName: guild.name,
+          backgroundImage: resolveBackgroundImageUrl(welcomeConfig?.goodbyeBackgroundImage),
+          backgroundColor: welcomeConfig?.goodbyeBackgroundColor,
+          backgroundOverlay: welcomeConfig?.goodbyeBackgroundOverlay,
+        })
+      ),
       generateCelebrationCard({ avatarUrl, accentColor: LEVEL_UP_ACCENT, line1: 'vous avez atteint', line2: 'le niveau 12' }),
       generateCelebrationCard({ avatarUrl, accentColor: rewardAccent, line1: 'vous recevez le rôle', line2: rewardRoleName, emoji: '🎉' }),
       generateCelebrationCard({ avatarUrl, accentColor: rewardAccent, line1: 'vous recevez le rôle', line2: rewardRoleName, emoji: '🎉' }),

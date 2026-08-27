@@ -9,7 +9,7 @@ const PHRASES = [
   '👀 Observe La Communauté',
 ];
 
-const MIN_DELAY_MS = 30_000;
+const MIN_DELAY_MS = 40_000;
 const MAX_DELAY_MS = 60_000;
 
 function randomDelay(): number {
@@ -27,7 +27,10 @@ export function startPresenceRotation(client: Client<true>) {
   function tick() {
     const phrase = randomPhrase();
     client.user.setPresence({
-      activities: [{ name: phrase, type: ActivityType.Custom, state: phrase }],
+      // ActivityType.Custom affiche une petite bulle flottante à côté de
+      // l'avatar (icône + texte) — Watching affiche une vraie carte "Regarde
+      // ..." dans le popup de profil, comme les autres bots (façon Novaria).
+      activities: [{ name: phrase, type: ActivityType.Watching }],
       status: 'online',
     });
     setTimeout(tick, randomDelay());

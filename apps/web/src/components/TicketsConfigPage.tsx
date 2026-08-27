@@ -344,7 +344,7 @@ export function TicketsConfigPage({
 
         <div className="space-y-5">
           <div>
-            <FieldLabel help="Ces rôles peuvent voir et gérer tous les tickets en plus de leur créateur.">
+            <FieldLabel help="Ces rôles peuvent voir et écrire dans tous les tickets, en plus de leur créateur — sans pouvoir les fermer ni les supprimer.">
               Rôles d&apos;accès aux tickets
             </FieldLabel>
             <MultiEntitySelect
@@ -356,7 +356,7 @@ export function TicketsConfigPage({
           </div>
 
           <div>
-            <FieldLabel help="Ces rôles reçoivent la responsabilité de traiter les tickets (validation, fermeture...).">
+            <FieldLabel help="Ces rôles peuvent voir, gérer (validation, réouverture...), fermer et supprimer n'importe quel ticket.">
               Rôles modérateurs de tickets
             </FieldLabel>
             <MultiEntitySelect

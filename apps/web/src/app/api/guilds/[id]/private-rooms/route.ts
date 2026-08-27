@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@discord-bot-dashboard/database';
 import { requireGuildAccess } from '@/lib/guild-access';
+import { parseIdList } from '@/lib/id-list';
 
 type Params = { params: { id: string } };
 
@@ -23,11 +24,6 @@ const DEFAULTS = {
   untouchableRoleIds: [] as string[],
   accessRoleIds: [] as string[],
 };
-
-function roleIdList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === 'string').slice(0, 50);
-}
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
@@ -65,9 +61,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
     creatorManagePermissions: !!body.creatorManagePermissions,
     allowClaim: !!body.allowClaim,
     configMenuEnabled: !!body.configMenuEnabled,
-    moderatorRoleIds: roleIdList(body.moderatorRoleIds),
-    untouchableRoleIds: roleIdList(body.untouchableRoleIds),
-    accessRoleIds: roleIdList(body.accessRoleIds),
+    moderatorRoleIds: parseIdList(body.moderatorRoleIds),
+    untouchableRoleIds: parseIdList(body.untouchableRoleIds),
+    accessRoleIds: parseIdList(body.accessRoleIds),
   };
 
   const updated = await prisma.privateRoomConfig.upsert({

@@ -273,6 +273,10 @@ async function handleCloseButton(interaction: ButtonInteraction) {
   const { ticket, config } = resolved;
 
   const isCreator = interaction.user.id === ticket.creatorId;
+  if (!isCreator && !canModerateTicket(interaction, config)) {
+    await interaction.reply({ content: 'Vous n\'avez pas la permission de fermer ce ticket.', flags: MessageFlags.Ephemeral });
+    return;
+  }
   if (!isCreator && config.askCloseReason) {
     const modal = new ModalBuilder().setCustomId(TICKET_CLOSE_REASON_MODAL_ID).setTitle('Fermeture du ticket');
     const input = new TextInputBuilder()
@@ -314,6 +318,10 @@ async function handleCloseConfirm(interaction: ButtonInteraction, confirmed: boo
   }
   const resolved = await resolveTicket(interaction, 'open');
   if (!resolved) return;
+  if (interaction.user.id !== resolved.ticket.creatorId && !canModerateTicket(interaction, resolved.config)) {
+    await interaction.update({ content: 'Vous n\'avez pas la permission de fermer ce ticket.', embeds: [], components: [] });
+    return;
+  }
   await interaction.update({ content: 'Fermeture en cours...', embeds: [], components: [] });
   await closeTicket(interaction, resolved.ticket, resolved.config, null);
 }

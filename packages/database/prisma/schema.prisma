@@ -14,25 +14,58 @@ datasource db {
 }
 
 model Guild {
-  id                 String               @id
-  name               String
-  icon               String?
-  updatedAt          DateTime             @updatedAt
-  LevelRole          LevelRole[]
-  TemporaryRoleGrant TemporaryRoleGrant[]
-  LogsConfig         LogsConfig?
-  PrivateRoom        PrivateRoom[]
-  PrivateRoomConfig  PrivateRoomConfig?
-  ReactionRolePanel  ReactionRolePanel[]
-  SavedMessage       SavedMessage[]
-  ServerTagConfig    ServerTagConfig?
-  StatsChannel       StatsChannel[]
-  Ticket             Ticket[]
-  TicketConfig       TicketConfig?
-  TicketRequest      TicketRequest[]
-  UserXp             UserXp[]
-  welcomeConfig      WelcomeConfig?
-  XpSettings         XpSettings?
+  id                  String                @id
+  name                String
+  icon                String?
+  updatedAt           DateTime              @updatedAt
+  LevelRole           LevelRole[]
+  TemporaryRoleGrant  TemporaryRoleGrant[]
+  LogsConfig          LogsConfig?
+  PrivateRoom         PrivateRoom[]
+  PrivateRoomConfig   PrivateRoomConfig?
+  ReactionRolePanel   ReactionRolePanel[]
+  SavedMessage        SavedMessage[]
+  ServerTagConfig     ServerTagConfig?
+  StatsChannel        StatsChannel[]
+  Ticket              Ticket[]
+  TicketConfig        TicketConfig?
+  TicketRequest       TicketRequest[]
+  UserXp              UserXp[]
+  welcomeConfig       WelcomeConfig?
+  WordReactionConfig  WordReactionConfig?
+  WordReactionTrigger WordReactionTrigger[]
+  XpSettings          XpSettings?
+}
+
+// Réagit automatiquement (emoji) quand un message commence par une phrase
+// configurée, insensible à la casse — restrictions de rôles/salons
+// globales au module (pas par déclencheur), façon DraftBot.
+model WordReactionConfig {
+  id          String   @id
+  guildId     String   @unique
+  enabled     Boolean  @default(false)
+  // "allow" = seuls ces rôles/salons déclenchent une réaction ; "deny" =
+  // tous sauf ceux-ci. Vide = tout le monde/partout, quel que soit le mode.
+  roleMode    String   @default("allow")
+  roleIds     String[] @default([])
+  channelMode String   @default("allow")
+  channelIds  String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model WordReactionTrigger {
+  id        String   @id
+  guildId   String
+  // Comparée au début du message (trim + minuscule) — "Salut" dans le
+  // message correspond à "salut" configuré ici.
+  phrase    String
+  emojis    String[] @default([])
+  createdAt DateTime @default(now())
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
 }
 
 model WelcomeConfig {
@@ -171,18 +204,18 @@ model TicketConfig {
 // temporaire dont le créateur devient propriétaire (voir PrivateRoom), façon
 // DraftBot. `categoryId` vide = crée dans la même catégorie que le hub.
 model PrivateRoomConfig {
-  id           String   @id
-  guildId      String   @unique
-  enabled      Boolean  @default(false)
-  hubChannelId String?
-  categoryId   String?
-  nameTemplate String   @default("🔊 Salon de {user}")
+  id                       String   @id
+  guildId                  String   @unique
+  enabled                  Boolean  @default(false)
+  hubChannelId             String?
+  categoryId               String?
+  nameTemplate             String   @default("🔊 Salon de {user}")
   // 0 = illimité, comme le "User Limit" natif d'un salon vocal Discord.
-  userLimit    Int      @default(0)
+  userLimit                Int      @default(0)
   // "category" = le salon créé hérite des permissions de sa catégorie
   // (comportement Discord par défaut) ; "hub" = il copie plutôt les
   // permissions du salon de création lui-même.
-  permissionSource String @default("category")
+  permissionSource         String   @default("category")
   // Permissions Discord données au créateur sur son propre salon (en plus
   // des droits qu'il a déjà par ses rôles) — voir applyCreatorPermissions
   // dans privateRooms.ts pour le détail de chaque flag.
@@ -194,22 +227,22 @@ model PrivateRoomConfig {
   creatorManagePermissions Boolean  @default(false)
   // Un membre encore présent peut réclamer la propriété d'un salon dont le
   // créateur est parti, via le bouton "Transfert" du menu.
-  allowClaim         Boolean  @default(true)
+  allowClaim               Boolean  @default(true)
   // Poste un message avec des boutons (Ouvrir/Fermer, Privé, Renommer,
   // Limite, Purge, Transfert, Liste blanche/noire) dans chaque salon créé.
-  configMenuEnabled  Boolean  @default(true)
+  configMenuEnabled        Boolean  @default(true)
   // Rôles qui peuvent utiliser le menu sur N'IMPORTE QUEL salon temporaire,
   // pas seulement le leur.
-  moderatorRoleIds   String[] @default([])
+  moderatorRoleIds         String[] @default([])
   // Rôles qui ne peuvent jamais être expulsés/mis en liste noire (Purge,
   // bouton Liste noire les ignorent).
-  untouchableRoleIds String[] @default([])
+  untouchableRoleIds       String[] @default([])
   // Rôles autorisés à rejoindre un salon par défaut (mode "ouvert") — vide
   // = tout le monde (@everyone), comme le reste du projet pour ce genre de liste.
-  accessRoleIds      String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime
-  Guild        Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  accessRoleIds            String[] @default([])
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime
+  Guild                    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
 // Un salon vocal temporaire actuellement suivi — sert à savoir qui en est le
@@ -217,19 +250,19 @@ model PrivateRoomConfig {
 // et à le supprimer dès qu'il se vide (y compris pour rattraper les
 // orphelins si le bot a redémarré pendant qu'un salon existait).
 model PrivateRoom {
-  id        String   @id
-  guildId   String
-  channelId String   @unique
-  ownerId   String
+  id               String   @id
+  guildId          String
+  channelId        String   @unique
+  ownerId          String
   // "open" (rôles d'accès de base), "closed" (personne de nouveau ne peut
   // rejoindre), "private" (invisible pour les non-membres), "whitelist"
   // (seuls whitelistUserIds + le propriétaire), "blacklist" (tout le monde
   // sauf blacklistUserIds).
-  mode            String   @default("open")
+  mode             String   @default("open")
   whitelistUserIds String[] @default([])
   blacklistUserIds String[] @default([])
-  createdAt DateTime @default(now())
-  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  Guild            Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId])
 }
@@ -252,7 +285,7 @@ model TicketRequest {
 }
 
 model UserXp {
-  id            String    @id
+  id            String   @id
   guildId       String
   discordUserId String
   username      String
@@ -261,54 +294,54 @@ model UserXp {
   // classement même quand le membre n'est plus dans le cache du bot.
   handle        String?
   avatar        String?
-  xp            Int       @default(0)
-  level         Int       @default(0)
-  createdAt     DateTime  @default(now())
+  xp            Int      @default(0)
+  level         Int      @default(0)
+  createdAt     DateTime @default(now())
   updatedAt     DateTime
-  Guild         Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  Guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, discordUserId])
   @@index([guildId, xp])
 }
 
 model XpSettings {
-  id                     String   @id
-  guildId                String   @unique
-  enabled                Boolean  @default(false)
-  xpMin                  Int      @default(15)
-  xpMax                  Int      @default(25)
-  cooldownSeconds        Int      @default(30)
-  levelUpChannelId       String?
-  levelUpMessage         String   @default("{user}, vous venez de passer au niveau {level} !")
-  ignoredChannelIds      String[] @default([])
-  ignoredRoleIds         String[] @default([])
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime
-  boosterChannelIds      String[] @default([])
-  boosterRoleIds         String[] @default([])
-  curveMultiplier        Float    @default(1)
-  curveStyle             String   @default("exponential")
-  levelUpAnnounceMode    String   @default("channel")
-  levelUpMinLevel        Int      @default(0)
-  longMessageDoubleXp    Boolean  @default(false)
-  maxLevel               Int      @default(0)
-  resetXpOnBan           Boolean  @default(false)
-  resetXpOnLeave         Boolean  @default(true)
-  rewardAnnounceMode     String   @default("channel")
-  rewardChannelId        String?
-  rewardMessage          String   @default("{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !")
-  viewOthersLevel        Boolean  @default(true)
-  publicLeaderboardEnabled Boolean @default(false)
-  xpChannelMode          String   @default("without")
-  xpInForumPosts         Boolean  @default(true)
-  xpInThreads            Boolean  @default(true)
-  xpRoleMode             String   @default("without")
-  voiceTextXpMode        String   @default("everyone")
-  voiceXpEnabled         Boolean  @default(false)
-  voiceXpIntervalSeconds Int      @default(60)
-  voiceXpMax             Int      @default(15)
-  voiceXpMin             Int      @default(5)
-  Guild                  Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  id                       String   @id
+  guildId                  String   @unique
+  enabled                  Boolean  @default(false)
+  xpMin                    Int      @default(15)
+  xpMax                    Int      @default(25)
+  cooldownSeconds          Int      @default(30)
+  levelUpChannelId         String?
+  levelUpMessage           String   @default("{user}, vous venez de passer au niveau {level} !")
+  ignoredChannelIds        String[] @default([])
+  ignoredRoleIds           String[] @default([])
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime
+  boosterChannelIds        String[] @default([])
+  boosterRoleIds           String[] @default([])
+  curveMultiplier          Float    @default(1)
+  curveStyle               String   @default("exponential")
+  levelUpAnnounceMode      String   @default("channel")
+  levelUpMinLevel          Int      @default(0)
+  longMessageDoubleXp      Boolean  @default(false)
+  maxLevel                 Int      @default(0)
+  resetXpOnBan             Boolean  @default(false)
+  resetXpOnLeave           Boolean  @default(true)
+  rewardAnnounceMode       String   @default("channel")
+  rewardChannelId          String?
+  rewardMessage            String   @default("{user}, voici votre récompense pour avoir atteint le **niveau {reward.level}** !")
+  viewOthersLevel          Boolean  @default(true)
+  publicLeaderboardEnabled Boolean  @default(false)
+  xpChannelMode            String   @default("without")
+  xpInForumPosts           Boolean  @default(true)
+  xpInThreads              Boolean  @default(true)
+  xpRoleMode               String   @default("without")
+  voiceTextXpMode          String   @default("everyone")
+  voiceXpEnabled           Boolean  @default(false)
+  voiceXpIntervalSeconds   Int      @default(60)
+  voiceXpMax               Int      @default(15)
+  voiceXpMin               Int      @default(5)
+  Guild                    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 }
 
 // Compteur journalier d'arrivées/départs — agrégé au jour plutôt qu'un
@@ -386,25 +419,25 @@ model StatsChannel {
 // les rôles/salons en base. `mappings` : [{ emoji, roleId }].
 // `messageId` reste vide tant que le panneau n'a jamais été publié.
 model ReactionRolePanel {
-  id          String   @id
-  guildId     String
-  name        String
-  channelId   String?
-  messageId   String?  @unique
+  id        String   @id
+  guildId   String
+  name      String
+  channelId String?
+  messageId String?  @unique
   // "normal" = ajoute le rôle à la réaction, le retire au retrait — seul
   // mode pour l'instant, gardé en colonne pour ajouter d'autres modes plus
   // tard sans nouvelle migration.
-  mode        String   @default("normal")
-  content     String?
-  imageUrl    String?
+  mode      String   @default("normal")
+  content   String?
+  imageUrl  String?
   // Un seul embed (même forme que EmbedData/EmbedEditor.tsx, comme le
   // composeur de messages) — null tant que l'utilisateur n'a pas cliqué sur
   // l'onglet Embed, pas de valeurs par défaut déduites.
-  embedData   Json?
-  mappings    Json     @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  Guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  embedData Json?
+  mappings  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId])
 }

@@ -11,13 +11,17 @@ const CHANNEL_ACCESS = [
   PermissionsBitField.Flags.AttachFiles,
 ];
 
-// Règles de nommage des salons Discord : minuscules, alphanumériques + tiret
-// / underscore, 100 caractères max.
+// Règles de nommage des salons Discord : minuscules, tiret/underscore,
+// 100 caractères max — mais Discord accepte les lettres/chiffres de
+// n'importe quel alphabet (cyrillique, cherokee, CJK...), pas seulement
+// l'ASCII : \p{L}/\p{N} plutôt que a-z0-9 pour ne pas vider les pseudos
+// "stylisés" hors alphabet latin (ne laissait autrement que les quelques
+// lettres latines qu'ils contiennent, voire rien du tout).
 function sanitizeChannelName(raw: string): string {
   const cleaned = raw
     .toLowerCase()
     .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-_]/g, '')
+    .replace(/[^\p{L}\p{N}_-]/gu, '')
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '');
   return (cleaned || 'ticket').slice(0, 100);

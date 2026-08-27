@@ -119,6 +119,18 @@ export async function generateWelcomeBanner({
   return canvas.toBuffer('image/png');
 }
 
+// Le dashboard stocke un chemin relatif (/uploads/...) pour une image
+// uploadée : le bot tourne dans un process séparé, il lui faut l'URL
+// complète du serveur web pour aller la charger. Une URL externe collée
+// directement dans le dashboard est déjà absolue — on ne la préfixe pas,
+// sinon on obtient une URL invalide.
+export function resolveBackgroundImageUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  return `${appUrl}${path}`;
+}
+
 function fillDefaultGradient(ctx: SKRSContext2D, kind: 'welcome' | 'goodbye') {
   const baseColor = kind === 'welcome' ? '#2f9e44' : '#c92a2a';
   const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);

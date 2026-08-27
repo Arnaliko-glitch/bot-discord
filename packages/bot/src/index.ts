@@ -23,6 +23,7 @@ import { startPresenceRotation } from './modules/presence.js';
 import { reactionRolesModule } from './modules/reactionRoles/index.js';
 import { privateRoomsModule } from './modules/privateRooms/index.js';
 import { handlePrivateRoomInteraction } from './modules/privateRooms/interactions.js';
+import { wordReactionsModule } from './modules/wordReactions.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
@@ -84,6 +85,7 @@ const modules: BotModuleHandler[] = [
   serverTagModule,
   reactionRolesModule,
   privateRoomsModule,
+  wordReactionsModule,
 ];
 
 client.on(Events.InteractionCreate, async (interaction) => {

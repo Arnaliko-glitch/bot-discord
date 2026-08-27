@@ -1,20 +1,16 @@
 import { Events, type MessageReaction, type PartialMessageReaction, type User, type PartialUser } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../../client.js';
+import { extractCustomEmojiId } from '../../utils/emoji.js';
 
 interface Mapping {
   emoji: string;
   roleId: string;
 }
 
-// Les emojis personnalisés sont stockés au format Discord affiché
-// (<a:nom:id> ou <:nom:id>, voir EmojiPickerPanel côté dashboard) — on en
-// extrait l'id pour comparer à l'événement de réaction, qui ne porte que
-// l'id et le nom (le nom peut changer si le serveur renomme l'emoji, l'id
-// jamais).
 function matchesEmoji(stored: string, emoji: MessageReaction['emoji']): boolean {
-  const custom = /^<a?:\w+:(\d+)>$/.exec(stored);
-  return custom ? emoji.id === custom[1] : emoji.name === stored;
+  const customId = extractCustomEmojiId(stored);
+  return customId ? emoji.id === customId : emoji.name === stored;
 }
 
 async function handleReaction(
