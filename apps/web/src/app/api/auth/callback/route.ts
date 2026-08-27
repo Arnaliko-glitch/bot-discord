@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSessionCookieValue, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/auth';
+import { appOrigin, isSecureRequest } from '@/lib/request-origin';
 
 interface DiscordTokenResponse {
   access_token: string;
@@ -16,8 +17,8 @@ interface DiscordUser {
 }
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
+  const origin = appOrigin(request);
+  const code = new URL(request.url).searchParams.get('code');
   if (!code) return NextResponse.redirect(new URL('/?error=oauth', origin));
 
   const clientId = process.env.DISCORD_CLIENT_ID;
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
     httpOnly: true,
     // Basé sur le protocole réel de la requête plutôt que NODE_ENV : évite
     // de casser le cookie en dev si NODE_ENV vaut "production" dans .env.
-    secure: new URL(request.url).protocol === 'https:',
+    secure: isSecureRequest(request),
     sameSite: 'lax',
     maxAge: SESSION_MAX_AGE,
     path: '/',
