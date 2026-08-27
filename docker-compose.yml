@@ -92,6 +92,10 @@ services:
       - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_conf:/etc/letsencrypt:ro
+    # Permet à nginx de proxy /downloads et /icons vers l'Apache de l'hôte
+    # (port 8081, hors Docker) — voir location blocks dans nginx.conf.template.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     depends_on:
       - web
 
