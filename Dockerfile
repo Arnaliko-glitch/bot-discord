@@ -23,7 +23,11 @@ FROM deps AS builder
 COPY . .
 # `build` (pas juste `prisma generate` seul) : compile aussi dist/index.js
 # du package database, requis par web/bot qui en dépendent en workspace:*.
+# Pareil pour shared, dont web dépend aussi (main: ./dist/index.js) — sans
+# ce build, "@discord-bot-dashboard/shared" n'a pas de dist/ et web échoue
+# à la compilation ("Module not found").
 RUN pnpm --filter @discord-bot-dashboard/database build
+RUN pnpm --filter @discord-bot-dashboard/shared build
 RUN pnpm --filter web build
 RUN pnpm --filter bot build
 # Déploiement autonome du bot (dépendances de production uniquement,
