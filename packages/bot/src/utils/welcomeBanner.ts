@@ -40,7 +40,8 @@ export async function generateWelcomeBanner({
       const w = bg.width * scale;
       const h = bg.height * scale;
       ctx.drawImage(bg, (WIDTH - w) / 2, (HEIGHT - h) / 2, w, h);
-    } catch {
+    } catch (err) {
+      console.error(`Échec du chargement de l'image de fond (${backgroundImage}) :`, err);
       fillDefaultGradient(ctx, kind);
     }
   } else if (backgroundColor && backgroundColor !== 'none') {
