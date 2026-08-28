@@ -20,6 +20,33 @@ function toReactionParam(stored: string): string {
   return custom ? `${custom[1]}:${custom[2]}` : stored;
 }
 
+// Ajoute/retire une réaction avec re-essai sur 429 (limite de débit Discord
+// pour cet endpoint très facilement atteinte dès 5-6 réactions ajoutées
+// d'affilée) — sans ça, `fetch` ne rejette PAS sur un 429 (seulement sur une
+// vraie erreur réseau), donc un `.catch()` seul laissait passer l'échec en
+// silence et certaines réactions n'étaient jamais ajoutées.
+async function reactionRequest(
+  method: 'PUT' | 'DELETE',
+  channelId: string,
+  messageId: string,
+  param: string,
+  token: string | undefined,
+  attempt = 0
+): Promise<void> {
+  const res = await fetch(
+    `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(param)}/@me`,
+    { method, headers: { Authorization: `Bot ${token}` } }
+  ).catch(() => null);
+  if (!res) return;
+  if (res.status === 429 && attempt < 3) {
+    const body = (await res.json().catch(() => null)) as { retry_after?: number } | null;
+    const retryAfterMs = Math.ceil(((body?.retry_after ?? 1) + 0.1) * 1000);
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+    return reactionRequest(method, channelId, messageId, param, token, attempt + 1);
+  }
+  if (!res.ok) console.error(`Réaction ${method} ${param} échouée (${res.status})`);
+}
+
 export async function POST(_request: NextRequest, { params }: Params) {
   try {
     await requireGuildAccess(params.id);
@@ -92,19 +119,13 @@ export async function POST(_request: NextRequest, { params }: Params) {
   // version du panneau qui ne correspondent plus à aucun rôle mappé.
   const wantedParams = new Set(mappings.map((m) => toReactionParam(m.emoji)));
   for (const param of wantedParams) {
-    await fetch(
-      `https://discord.com/api/v10/channels/${sent.channel_id}/messages/${sent.id}/reactions/${encodeURIComponent(param)}/@me`,
-      { method: 'PUT', headers: { Authorization: `Bot ${token}` } }
-    ).catch(() => undefined);
+    await reactionRequest('PUT', sent.channel_id, sent.id, param, token);
   }
   for (const r of sent.reactions ?? []) {
     if (!r.me) continue;
     const key = r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name;
     if (wantedParams.has(key)) continue;
-    await fetch(
-      `https://discord.com/api/v10/channels/${sent.channel_id}/messages/${sent.id}/reactions/${encodeURIComponent(key)}/@me`,
-      { method: 'DELETE', headers: { Authorization: `Bot ${token}` } }
-    ).catch(() => undefined);
+    await reactionRequest('DELETE', sent.channel_id, sent.id, key, token);
   }
 
   const updated = await prisma.reactionRolePanel.update({
