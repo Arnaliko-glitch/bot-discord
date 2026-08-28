@@ -131,6 +131,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { headers, body } = buildDiscordRequestBody(payload, attachments);
 
+  // Log temporaire pour diagnostiquer un souci d'affichage d'images sur un
+  // embed au-delà du premier — à retirer une fois la cause confirmée.
+  console.log('[send] embeds envoyés:', JSON.stringify(payload.embeds, null, 2));
+
   const res = await fetch(url, {
     method: canEdit ? 'PATCH' : 'POST',
     headers,
