@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@discord-bot-dashboard/database';
 import { requireGuildAccess } from '@/lib/guild-access';
 import { buildDiscordRequestBody, fetchStandaloneImage } from '@/lib/discord-attachment';
-import { buildOneEmbed, type EmbedData } from '@/lib/discord-embed';
+import { buildEmbedGroup, type EmbedData } from '@/lib/discord-embed';
 
 type Params = { params: { id: string; panelId: string } };
 
@@ -42,7 +42,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   // / Image / Embed) — rien n'est généré ni ajouté automatiquement à partir
   // des rôles réactions.
   const panelEmbed = (panel.embedData ?? null) as EmbedData | null;
-  const embeds = panelEmbed ? [buildOneEmbed(panelEmbed)].filter((e) => Object.keys(e).length > 0) : [];
+  const embeds = panelEmbed ? buildEmbedGroup(panelEmbed).filter((e) => Object.keys(e).length > 0) : [];
   const content = panel.content || undefined;
 
   if (!content && embeds.length === 0 && !panel.imageUrl) {

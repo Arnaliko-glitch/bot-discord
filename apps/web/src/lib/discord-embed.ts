@@ -9,7 +9,7 @@ export interface EmbedData {
   description?: string | null;
   color?: string | null;
   fields?: { name: string; value: string }[];
-  imageUrl?: string | null;
+  imageUrls?: string[] | null;
   thumbnailUrl?: string | null;
   footerText?: string | null;
   footerIconUrl?: string | null;
@@ -24,7 +24,14 @@ export function toAbsoluteUrl(url: string): string {
   return `${appUrl}${url}`;
 }
 
-export function buildOneEmbed(embedData: EmbedData): Record<string, unknown> {
+// Discord n'a qu'un seul champ "image" par embed brut de l'API — pour
+// afficher plusieurs images (jusqu'à MAX_EMBED_IMAGES côté UI, voir
+// EmbedEditor.tsx) sous UN SEUL embed visuel, l'astuce standard est d'ajouter
+// un embed "image seule" supplémentaire par image, tous partageant la même
+// url : Discord regroupe automatiquement en galerie tous les embeds
+// consécutifs qui partagent une url identique. Retourne donc un tableau
+// (1 élément si 0 ou 1 image, embed principal + N-1 embeds "image" sinon).
+export function buildEmbedGroup(embedData: EmbedData): Record<string, unknown>[] {
   const embed: Record<string, unknown> = {};
   if (embedData.authorName) {
     embed.author = embedData.authorIconUrl
@@ -43,6 +50,18 @@ export function buildOneEmbed(embedData: EmbedData): Record<string, unknown> {
       : { text: embedData.footerText };
   }
   if (embedData.thumbnailUrl) embed.thumbnail = { url: toAbsoluteUrl(embedData.thumbnailUrl) };
-  if (embedData.imageUrl) embed.image = { url: toAbsoluteUrl(embedData.imageUrl) };
-  return embed;
+
+  const [firstImage, ...extraImages] = (embedData.imageUrls ?? []).filter(Boolean);
+  if (!firstImage) return [embed];
+
+  embed.image = { url: toAbsoluteUrl(firstImage) };
+  if (extraImages.length === 0) return [embed];
+
+  // Url de regroupement : celle du titre si l'utilisateur en a mis une
+  // (comportement inchangé), sinon une url synthétique — invisible, aucun
+  // titre n'est présent sur ces embeds "image seule" pour la rendre cliquable.
+  const groupUrl = embed.url ?? `https://dashboard.invalid/gallery/${crypto.randomUUID()}`;
+  embed.url = groupUrl;
+  const siblings = extraImages.map((url) => ({ url: groupUrl, image: { url: toAbsoluteUrl(url) } }));
+  return [embed, ...siblings];
 }

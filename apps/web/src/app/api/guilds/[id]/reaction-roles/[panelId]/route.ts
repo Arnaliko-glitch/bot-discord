@@ -92,10 +92,15 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       headers: { Authorization: `Bot ${token}` },
     }).catch(() => undefined);
   }
-  const embed = (existing.embedData ?? null) as { imageUrl?: string | null; thumbnailUrl?: string | null; authorIconUrl?: string | null; footerIconUrl?: string | null } | null;
+  const embed = (existing.embedData ?? null) as {
+    imageUrls?: string[] | null;
+    thumbnailUrl?: string | null;
+    authorIconUrl?: string | null;
+    footerIconUrl?: string | null;
+  } | null;
   await Promise.all(
-    [existing.imageUrl, embed?.imageUrl, embed?.thumbnailUrl, embed?.authorIconUrl, embed?.footerIconUrl].map((url) =>
-      deleteUploadedFile(params.id, url)
+    [existing.imageUrl, ...(embed?.imageUrls ?? []), embed?.thumbnailUrl, embed?.authorIconUrl, embed?.footerIconUrl].map(
+      (url) => deleteUploadedFile(params.id, url)
     )
   );
 

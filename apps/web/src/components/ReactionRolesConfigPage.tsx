@@ -54,7 +54,7 @@ function embedHasContent(embed: EmbedData | null): boolean {
       embed.description ||
       embed.fields.length > 0 ||
       embed.footerText ||
-      embed.imageUrl ||
+      embed.imageUrls.length > 0 ||
       embed.thumbnailUrl
   );
 }
@@ -224,7 +224,7 @@ export function ReactionRolesConfigPage({
   function imageUrlsOf(p: ReactionRolePanelData): (string | null)[] {
     return [
       p.imageUrl,
-      p.embedData?.imageUrl ?? null,
+      ...(p.embedData?.imageUrls ?? []),
       p.embedData?.thumbnailUrl ?? null,
       p.embedData?.authorIconUrl ?? null,
       p.embedData?.footerIconUrl ?? null,
@@ -251,7 +251,7 @@ export function ReactionRolesConfigPage({
 
   function removeEmbedSection() {
     if (draft.embedData) {
-      for (const url of [draft.embedData.imageUrl, draft.embedData.thumbnailUrl, draft.embedData.authorIconUrl, draft.embedData.footerIconUrl]) {
+      for (const url of [...draft.embedData.imageUrls, draft.embedData.thumbnailUrl, draft.embedData.authorIconUrl, draft.embedData.footerIconUrl]) {
         if (url && !isSavedImageUrl(url)) deleteServerFile(guildId, url);
       }
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@discord-bot-dashboard/database';
 import { requireGuildAccess } from '@/lib/guild-access';
 import { buildDiscordRequestBody, fetchStandaloneImage } from '@/lib/discord-attachment';
-import { buildOneEmbed, type EmbedData } from '@/lib/discord-embed';
+import { buildEmbedGroup, type EmbedData } from '@/lib/discord-embed';
 
 type Params = { params: { id: string; messageId: string } };
 
@@ -74,10 +74,14 @@ function buildDiscordPayload(message: {
   imageUrls: string[];
   buttons: unknown;
 }): { content?: string; embeds: Record<string, unknown>[]; components: Record<string, unknown>[] } {
+  // Chaque EmbedData peut se transformer en plusieurs embeds bruts (galerie
+  // d'images, voir buildEmbedGroup) — on plafonne quand même au total au
+  // maximum absolu de Discord (10 embeds par message).
   const embeds = normalizeEmbeds(message.embedData)
     .slice(0, 5)
-    .map(buildOneEmbed)
-    .filter((e) => Object.keys(e).length > 0);
+    .flatMap(buildEmbedGroup)
+    .filter((e) => Object.keys(e).length > 0)
+    .slice(0, 10);
 
   return {
     content: message.content ?? undefined,

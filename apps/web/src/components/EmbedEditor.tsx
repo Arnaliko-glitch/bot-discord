@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { CircleHelp, Copy, Image as ImageIcon, Link2, Palette, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { CircleHelp, Copy, GripVertical, Image as ImageIcon, Link2, Palette, Plus, Trash2 } from 'lucide-react';
 import type { Channel } from '@/components/ChannelSelect';
 import { EmojiPickerButton } from '@/components/EmojiPickerButton';
 import { MentionTextarea, type RoleOption } from '@/components/MentionTextarea';
@@ -22,7 +22,11 @@ export interface EmbedData {
   description: string | null;
   color: string | null;
   fields: EmbedField[];
-  imageUrl: string | null;
+  // Jusqu'à 4 images (voir MAX_EMBED_IMAGES) — Discord n'a qu'un seul champ
+  // "image" par embed brut, plusieurs images sont donc envoyées comme des
+  // embeds "image seule" supplémentaires partageant la même url, que Discord
+  // regroupe visuellement en galerie (voir buildEmbedGroup côté envoi).
+  imageUrls: string[];
   thumbnailUrl: string | null;
   footerText: string | null;
   footerIconUrl: string | null;
@@ -39,7 +43,7 @@ export const BLANK_EMBED: EmbedData = {
   description: null,
   color: DEFAULT_EMBED_COLOR,
   fields: [],
-  imageUrl: null,
+  imageUrls: [],
   thumbnailUrl: null,
   footerText: null,
   footerIconUrl: null,
@@ -320,6 +324,215 @@ export function EmbedImageSlot({
   );
 }
 
+export const MAX_EMBED_IMAGES = 4;
+
+// Une vignette d'image de galerie — recadrée (object-cover) pour remplir sa
+// case carrée, sauf en mode "seule" (voir ImageGrid) où elle garde ses
+// proportions naturelles sans recadrage. Partagée entre la galerie d'images
+// autonome d'un message et l'emplacement image principal d'un embed, pour ne
+// jamais avoir deux implémentations qui divergent.
+function ImageTile({
+  url,
+  index,
+  guildId,
+  urls,
+  onChange,
+  isSavedUrl,
+  dragIndex,
+  isDragOver,
+  onDragOverTile,
+  onOpenChange,
+  canAddMore,
+  tileClassName,
+  imgClassName = 'h-full w-full object-cover rounded',
+}: {
+  url: string;
+  index: number;
+  guildId: string;
+  urls: string[];
+  onChange: (urls: string[]) => void;
+  isSavedUrl: (url: string | null) => boolean;
+  dragIndex: React.MutableRefObject<number | null>;
+  isDragOver: boolean;
+  onDragOverTile: (index: number | null) => void;
+  onOpenChange: (open: boolean) => void;
+  canAddMore: boolean;
+  tileClassName: string;
+  imgClassName?: string;
+}) {
+  const [replaceOpen, setReplaceOpen] = useState(false);
+
+  // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde globale
+  // (voir save() dans le composant appelant) — sinon "Annuler" ne peut plus la
+  // restaurer. Seul un upload de cette session, jamais sauvegardé, peut être
+  // supprimé tout de suite quand on le remplace ou le retire.
+  function removeAt(i: number) {
+    if (!isSavedUrl(urls[i])) deleteServerFile(guildId, urls[i]);
+    onChange(urls.filter((_, idx) => idx !== i));
+  }
+
+  function moveTo(from: number, to: number) {
+    if (from === to) return;
+    const next = [...urls];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
+  }
+
+  function replaceWith(newUrls: string[]) {
+    if (!newUrls[0]) return;
+    if (!isSavedUrl(urls[index])) deleteServerFile(guildId, urls[index]);
+    const next = [...urls];
+    next[index] = newUrls[0];
+    onChange(next);
+    setReplaceOpen(false);
+  }
+
+  return (
+    <div
+      className={`group/img relative ${tileClassName}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (dragIndex.current !== null && dragIndex.current !== index) onDragOverTile(index);
+      }}
+      onDragLeave={() => onDragOverTile(null)}
+      onDrop={(e) => {
+        e.preventDefault();
+        if (dragIndex.current !== null) moveTo(dragIndex.current, index);
+        dragIndex.current = null;
+        onDragOverTile(null);
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setReplaceOpen(true)}
+        title="Remplacer l'image"
+        className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
+      >
+        <img src={url} alt="" className={imgClassName} />
+      </button>
+      {replaceOpen && <ImageUploadModal guildId={guildId} onUploaded={replaceWith} onClose={() => setReplaceOpen(false)} />}
+      <div
+        draggable
+        onDragStart={() => {
+          dragIndex.current = index;
+        }}
+        onDragEnd={() => onDragOverTile(null)}
+        title="Glisser pour réordonner"
+        className="absolute left-1 top-1 flex h-6 w-6 cursor-grab items-center justify-center rounded bg-black/60 text-white opacity-0 transition group-hover/img:opacity-100"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+      <button
+        type="button"
+        onClick={() => removeAt(index)}
+        title="Retirer l'image"
+        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+      {canAddMore && (
+        <button
+          type="button"
+          onClick={() => onOpenChange(true)}
+          title="Ajouter une image"
+          className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {isDragOver && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-full bg-[var(--accent)]" />}
+    </div>
+  );
+}
+
+// Galerie d'images (jusqu'à maxImages) — une seule image garde ses
+// proportions naturelles, à partir de deux elles deviennent des vignettes
+// carrées recadrées, 3 par ligne max (celles d'une ligne incomplète
+// s'agrandissent pour la remplir). Chaque vignette se glisse pour réordonner
+// (drag & drop HTML5, aucune dépendance) ; le "+" d'ajout apparaît au survol
+// de N'IMPORTE QUELLE vignette, pas seulement la dernière. Utilisée à la fois
+// pour la galerie d'images autonome d'un message et l'image principale d'un
+// embed (voir EmbedBlock).
+export function ImageGrid({
+  guildId,
+  urls,
+  onChange,
+  isSavedUrl,
+  maxImages,
+  open: openProp,
+  onOpenChange,
+}: {
+  guildId: string;
+  urls: string[];
+  onChange: (urls: string[]) => void;
+  isSavedUrl: (url: string | null) => boolean;
+  maxImages: number;
+  // Non contrôlé par défaut (état interne) — un appelant qui a besoin
+  // d'ouvrir la popup depuis l'extérieur (ex: au clic sur l'onglet "Image",
+  // sans second clic sur l'emplacement vide) passe ces deux props, comme le
+  // composeur de messages pour sa galerie autonome.
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
+  const dragIndex = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const canAddMore = urls.length < maxImages;
+  const single = urls.length === 1;
+  // Une seule ligne (2 ou 3 images) : chaque vignette s'agrandit pour remplir
+  // toute la largeur. Au-delà, grille fixe à 3 colonnes — une ligne
+  // incomplète (ex: la 4e toute seule) reste petite plutôt que de s'étirer.
+  const fillsOneRow = urls.length >= 2 && urls.length <= 3;
+
+  return (
+    <div className={single || fillsOneRow ? 'flex flex-wrap gap-2' : 'grid grid-cols-3 gap-2'}>
+      {urls.map((url, i) => (
+        <ImageTile
+          key={url + i}
+          url={url}
+          index={i}
+          guildId={guildId}
+          urls={urls}
+          onChange={onChange}
+          isSavedUrl={isSavedUrl}
+          dragIndex={dragIndex}
+          isDragOver={dragOverIndex === i}
+          onDragOverTile={setDragOverIndex}
+          onOpenChange={setOpen}
+          canAddMore={canAddMore}
+          tileClassName={single ? 'flex-none max-w-full' : fillsOneRow ? 'aspect-square flex-1' : 'aspect-square'}
+          imgClassName={single ? 'block h-auto max-h-[400px] w-auto max-w-full rounded' : undefined}
+        />
+      ))}
+      {urls.length === 0 && canAddMore && !open && (
+        <div className="relative aspect-square w-full max-w-[280px]">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            title="Ajouter une image"
+            className="flex h-full w-full items-center justify-center rounded border border-dashed border-white/20 text-gray-600 transition hover:border-[var(--accent)] hover:text-gray-400"
+          >
+            <ImageIcon className="h-6 w-6" />
+          </button>
+        </div>
+      )}
+      {open && (
+        <ImageUploadModal
+          guildId={guildId}
+          onUploaded={(newUrls) => {
+            onChange([...urls, ...newUrls].slice(0, maxImages));
+            setOpen(false);
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 export function EmbedColorPicker({
   value,
   onChange,
@@ -544,12 +757,12 @@ export function EmbedBlock({
             />
           </div>
 
-          <EmbedImageSlot
+          <ImageGrid
             guildId={guildId}
-            value={embed.imageUrl}
-            onChange={(v) => onUpdate('imageUrl', v)}
+            urls={embed.imageUrls}
+            onChange={(v) => onUpdate('imageUrls', v)}
             isSavedUrl={isSavedUrl}
-            size="large"
+            maxImages={MAX_EMBED_IMAGES}
           />
 
           <div className="flex items-center justify-between gap-3 pt-1">

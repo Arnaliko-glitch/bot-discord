@@ -6,12 +6,10 @@ import {
   CircleHelp,
   ExternalLink,
   FileText,
-  GripVertical,
   Image as ImageIcon,
   LayoutGrid,
   Link2,
   MousePointerClick,
-  Plus,
   Smile,
   SquareMenu,
   Trash2,
@@ -22,7 +20,7 @@ import {
   BLANK_EMBED,
   deleteServerFile,
   EmbedBlock,
-  ImageUploadModal,
+  ImageGrid,
   totalEmbedChars,
   type EmbedData,
   type EmbedField,
@@ -260,7 +258,9 @@ export function MessagesConfigPage({
     const target = draft.embedData[index];
     // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde (voir
     // save()), pas ici — sinon "Annuler" ne peut plus la restaurer.
-    if (target?.imageUrl && !isSavedImageUrl(target.imageUrl)) deleteServerFile(guildId, target.imageUrl);
+    for (const url of target?.imageUrls ?? []) {
+      if (!isSavedImageUrl(url)) deleteServerFile(guildId, url);
+    }
     if (target?.thumbnailUrl && !isSavedImageUrl(target.thumbnailUrl)) deleteServerFile(guildId, target.thumbnailUrl);
     if (target?.authorIconUrl && !isSavedImageUrl(target.authorIconUrl)) deleteServerFile(guildId, target.authorIconUrl);
     if (target?.footerIconUrl && !isSavedImageUrl(target.footerIconUrl)) deleteServerFile(guildId, target.footerIconUrl);
@@ -292,7 +292,7 @@ export function MessagesConfigPage({
     const saved = JSON.parse(lastSaved) as MessageData;
     if (saved.imageUrls.includes(url)) return true;
     return saved.embedData.some(
-      (e) => e.imageUrl === url || e.thumbnailUrl === url || e.authorIconUrl === url || e.footerIconUrl === url
+      (e) => e.imageUrls.includes(url) || e.thumbnailUrl === url || e.authorIconUrl === url || e.footerIconUrl === url
     );
   }
 
@@ -327,12 +327,12 @@ export function MessagesConfigPage({
     const keptUrls = new Set(
       [
         ...updated.imageUrls,
-        ...updated.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
+        ...updated.embedData.flatMap((e) => [...e.imageUrls, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
       ].filter(Boolean)
     );
     const previousUrls = [
       ...previous.imageUrls,
-      ...previous.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
+      ...previous.embedData.flatMap((e) => [...e.imageUrls, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
     ];
     for (const url of previousUrls) {
       if (url && !keptUrls.has(url)) deleteServerFile(guildId, url);
@@ -379,7 +379,7 @@ export function MessagesConfigPage({
     if (!res.ok) return;
     m.imageUrls.forEach((url) => deleteServerFile(guildId, url));
     m.embedData.forEach((e) => {
-      deleteServerFile(guildId, e.imageUrl);
+      e.imageUrls.forEach((url) => deleteServerFile(guildId, url));
       deleteServerFile(guildId, e.thumbnailUrl);
       deleteServerFile(guildId, e.authorIconUrl);
       deleteServerFile(guildId, e.footerIconUrl);
@@ -502,6 +502,7 @@ export function MessagesConfigPage({
                           guildId={guildId}
                           urls={draft.imageUrls}
                           onChange={(v) => update('imageUrls', v)}
+                          maxImages={MAX_IMAGES}
                           open={imagePopupOpen}
                           onOpenChange={handleImagePopupChange}
                           isSavedUrl={isSavedImageUrl}
@@ -593,12 +594,12 @@ export function MessagesConfigPage({
                   const keep = new Set(
                     [
                       ...saved.imageUrls,
-                      ...saved.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
+                      ...saved.embedData.flatMap((e) => [...e.imageUrls, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
                     ].filter(Boolean)
                   );
                   const current = [
                     ...draft.imageUrls,
-                    ...draft.embedData.flatMap((e) => [e.imageUrl, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
+                    ...draft.embedData.flatMap((e) => [...e.imageUrls, e.thumbnailUrl, e.authorIconUrl, e.footerIconUrl]),
                   ];
                   for (const url of current) {
                     if (url && !keep.has(url)) deleteServerFile(guildId, url);
@@ -697,204 +698,6 @@ export function MessagesConfigPage({
             else updateButtonAt(editingButtonIndex, button);
             setEditingButtonIndex(null);
           }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Une vignette d'image de la galerie — recadrée (object-cover) pour remplir
-// sa case carrée, sauf en mode "seule" (voir ImageGrid) où elle garde ses
-// proportions naturelles sans recadrage.
-function ImageTile({
-  url,
-  index,
-  guildId,
-  urls,
-  onChange,
-  isSavedUrl,
-  dragIndex,
-  isDragOver,
-  onDragOverTile,
-  onOpenChange,
-  isLastOverall,
-  canAddMore,
-  tileClassName,
-  imgClassName = 'h-full w-full object-cover rounded',
-}: {
-  url: string;
-  index: number;
-  guildId: string;
-  urls: string[];
-  onChange: (urls: string[]) => void;
-  isSavedUrl: (url: string | null) => boolean;
-  dragIndex: React.MutableRefObject<number | null>;
-  isDragOver: boolean;
-  onDragOverTile: (index: number | null) => void;
-  onOpenChange: (open: boolean) => void;
-  isLastOverall: boolean;
-  canAddMore: boolean;
-  tileClassName: string;
-  imgClassName?: string;
-}) {
-  const [replaceOpen, setReplaceOpen] = useState(false);
-
-  // Une image déjà enregistrée n'est nettoyée qu'à la sauvegarde globale
-  // (voir save() dans MessagesConfigPage) — sinon "Annuler" ne peut plus la
-  // restaurer. Seul un upload de cette session, jamais sauvegardé, peut être
-  // supprimé tout de suite quand on le remplace ou le retire.
-  function removeAt(i: number) {
-    if (!isSavedUrl(urls[i])) deleteServerFile(guildId, urls[i]);
-    onChange(urls.filter((_, idx) => idx !== i));
-  }
-
-  function moveTo(from: number, to: number) {
-    if (from === to) return;
-    const next = [...urls];
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
-    onChange(next);
-  }
-
-  function replaceWith(newUrls: string[]) {
-    if (!newUrls[0]) return;
-    if (!isSavedUrl(urls[index])) deleteServerFile(guildId, urls[index]);
-    const next = [...urls];
-    next[index] = newUrls[0];
-    onChange(next);
-    setReplaceOpen(false);
-  }
-
-  return (
-    <div
-      className={`group/img relative ${tileClassName}`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (dragIndex.current !== null && dragIndex.current !== index) onDragOverTile(index);
-      }}
-      onDragLeave={() => onDragOverTile(null)}
-      onDrop={(e) => {
-        e.preventDefault();
-        if (dragIndex.current !== null) moveTo(dragIndex.current, index);
-        dragIndex.current = null;
-        onDragOverTile(null);
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => setReplaceOpen(true)}
-        title="Remplacer l'image"
-        className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
-      >
-        <img src={url} alt="" className={imgClassName} />
-      </button>
-      {replaceOpen && <ImageUploadModal guildId={guildId} onUploaded={replaceWith} onClose={() => setReplaceOpen(false)} />}
-      <div
-        draggable
-        onDragStart={() => {
-          dragIndex.current = index;
-        }}
-        onDragEnd={() => onDragOverTile(null)}
-        title="Glisser pour réordonner"
-        className="absolute left-1 top-1 flex h-6 w-6 cursor-grab items-center justify-center rounded bg-black/60 text-white opacity-0 transition group-hover/img:opacity-100"
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </div>
-      <button
-        type="button"
-        onClick={() => removeAt(index)}
-        title="Retirer l'image"
-        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
-      >
-        <Trash2 className="h-3 w-3" />
-      </button>
-      {isLastOverall && canAddMore && (
-        <button
-          type="button"
-          onClick={() => onOpenChange(true)}
-          title="Ajouter une image"
-          className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-black/60 text-white opacity-0 transition hover:bg-black/80 group-hover/img:opacity-100"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      )}
-      {isDragOver && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-full bg-[var(--accent)]" />}
-    </div>
-  );
-}
-
-// Galerie d'images autonomes du message (jusqu'à MAX_IMAGES) — une seule
-// image garde ses proportions naturelles, à partir de deux elles deviennent
-// des vignettes carrées recadrées, 3 par ligne max (celles d'une ligne
-// incomplète s'agrandissent pour la remplir). Chaque vignette se glisse pour
-// réordonner (drag & drop HTML5, aucune dépendance).
-function ImageGrid({
-  guildId,
-  urls,
-  onChange,
-  isSavedUrl,
-  open,
-  onOpenChange,
-}: {
-  guildId: string;
-  urls: string[];
-  onChange: (urls: string[]) => void;
-  isSavedUrl: (url: string | null) => boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const dragIndex = useRef<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const canAddMore = urls.length < MAX_IMAGES;
-  const single = urls.length === 1;
-  // Une seule ligne (2 ou 3 images) : chaque vignette s'agrandit pour
-  // remplir toute la largeur. Au-delà, grille fixe à 3 colonnes — une ligne
-  // incomplète (ex: la 4e toute seule) reste petite plutôt que de s'étirer.
-  const fillsOneRow = urls.length >= 2 && urls.length <= 3;
-
-  return (
-    <div className={single || fillsOneRow ? 'flex flex-wrap gap-2' : 'grid grid-cols-3 gap-2'}>
-      {urls.map((url, i) => (
-        <ImageTile
-          key={url + i}
-          url={url}
-          index={i}
-          guildId={guildId}
-          urls={urls}
-          onChange={onChange}
-          isSavedUrl={isSavedUrl}
-          dragIndex={dragIndex}
-          isDragOver={dragOverIndex === i}
-          onDragOverTile={setDragOverIndex}
-          onOpenChange={onOpenChange}
-          isLastOverall={i === urls.length - 1}
-          canAddMore={canAddMore}
-          tileClassName={
-            single ? 'flex-none max-w-full' : fillsOneRow ? 'aspect-square flex-1' : 'aspect-square'
-          }
-          imgClassName={single ? 'block h-auto max-h-[400px] w-auto max-w-full rounded' : undefined}
-        />
-      ))}
-      {urls.length === 0 && canAddMore && !open && (
-        <div className="relative aspect-square w-full max-w-[280px]">
-          <button
-            type="button"
-            onClick={() => onOpenChange(true)}
-            title="Ajouter une image"
-            className="flex h-full w-full items-center justify-center rounded border border-dashed border-white/20 text-gray-600 transition hover:border-[var(--accent)] hover:text-gray-400"
-          >
-            <ImageIcon className="h-6 w-6" />
-          </button>
-        </div>
-      )}
-      {open && (
-        <ImageUploadModal
-          guildId={guildId}
-          onUploaded={(newUrls) => {
-            onChange([...urls, ...newUrls].slice(0, MAX_IMAGES));
-            onOpenChange(false);
-          }}
-          onClose={() => onOpenChange(false)}
         />
       )}
     </div>

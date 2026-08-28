@@ -14,11 +14,14 @@ function normalizeMappings(raw: unknown): ReactionRoleMapping[] {
 }
 
 // Complète les champs manquants (ancien panneau enregistré avant l'ajout
-// d'un champ à EmbedData) pour que le composant n'ait jamais à gérer un
-// embed partiel — même principe que normalizeEmbeds côté module Messages.
+// d'un champ à EmbedData, ou avant le passage d'imageUrl (image unique) à
+// imageUrls) pour que le composant n'ait jamais à gérer un embed partiel —
+// même principe que normalizeEmbeds côté module Messages.
 function normalizeEmbed(raw: unknown): EmbedData | null {
   if (!raw || typeof raw !== 'object') return null;
-  return { ...BLANK_EMBED, ...(raw as Partial<EmbedData>) };
+  const partial = raw as Partial<EmbedData> & { imageUrl?: string | null };
+  const imageUrls = partial.imageUrls ?? (partial.imageUrl ? [partial.imageUrl] : []);
+  return { ...BLANK_EMBED, ...partial, imageUrls };
 }
 
 export default async function ReactionRolesPage({ params }: { params: { guildId: string } }) {
