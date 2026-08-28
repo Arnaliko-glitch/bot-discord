@@ -113,7 +113,13 @@ async function openTicketRequest(interaction: ButtonInteraction | ModalSubmitInt
     new ButtonBuilder().setCustomId(`${TICKET_DENY_PREFIX}${request.id}`).setLabel('Refuser').setStyle(ButtonStyle.Danger)
   );
 
-  const validationMessage = await logChannel.send({ embeds: [embed], components: [row] });
+  // Même logique que createTicketChannel pour l'ouverture directe (sans
+  // validation) : mentionne les rôles modérateurs si l'option est activée —
+  // manquait ici, la demande partait toujours sans jamais les mentionner.
+  const content = config.mentionModerators
+    ? config.moderatorRoleIds.map((roleId) => `<@&${roleId}>`).join(' ') || undefined
+    : undefined;
+  const validationMessage = await logChannel.send({ content, embeds: [embed], components: [row] });
   await prisma.ticketRequest.update({
     where: { id: request.id },
     data: { validationChannelId: logChannel.id, validationMessageId: validationMessage.id },
