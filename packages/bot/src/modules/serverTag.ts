@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder, Events, type Guild, type GuildMember, type User } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder, Events, type Guild, type GuildMember, type PartialUser, type User } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { ServerTagConfig } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../client.js';
@@ -102,30 +102,49 @@ async function applyTagRoleState(guild: Guild, member: GuildMember, config: Serv
   }
 }
 
-// Les événements en direct (GuildMemberUpdate, PresenceUpdate) ne se
-// déclenchent qu'à l'occasion d'une activité quelconque du membre (message,
-// changement de statut...) sur CE serveur précis — un membre resté silencieux
-// ici juste après avoir changé son tag peut ne générer aucun événement scopé
-// sur cette guilde avant longtemps, même si le bot partage bien un autre
-// serveur plus actif avec lui entre-temps (vérifié en pratique : événements
-// reçus, mais scopés sur l'autre guilde). D'où la resynchronisation
-// périodique ci-dessous en filet de sécurité, en plus de l'écoute en direct.
-async function handleMemberUpdate(member: GuildMember) {
-  const config = await prisma.serverTagConfig.findUnique({ where: { guildId: member.guild.id } });
-  if (!config?.enabled || !config.roleId) return;
-  await applyTagRoleState(member.guild, member, config, true);
+// Events.UserUpdate est un événement discord.js "synthétisé" — en interne,
+// GuildMemberUpdate ET PresenceUpdate déclenchent tous les deux
+// client.actions.UserUpdate.handle() dès que le user imbriqué a changé (voir
+// GuildMemberUpdate.js/PresenceUpdate.js dans discord.js), et cet événement
+// n'est PAS scopé à une seule guilde contrairement aux deux précédents — il
+// se déclenche dès qu'un changement est détecté sur N'IMPORTE QUELLE guilde
+// partagée. D'où la recherche explicite ci-dessous sur toutes les guildes du
+// bot plutôt que de se fier à `member.guild` d'un événement guild-scopé (ce
+// qui ratait le cas où le membre n'a d'activité que sur une AUTRE guilde
+// partagée avec le bot).
+async function syncTagRole(client: BotClient, oldUser: User | PartialUser, newUser: User) {
+  const relevantGuildIds = new Set(
+    [oldUser.primaryGuild?.identityGuildId, newUser.primaryGuild?.identityGuildId].filter((id): id is string =>
+      Boolean(id)
+    )
+  );
+  if (relevantGuildIds.size === 0) return;
+
+  for (const guildId of relevantGuildIds) {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) continue;
+
+    const config = await prisma.serverTagConfig.findUnique({ where: { guildId } });
+    if (!config?.enabled || !config.roleId) continue;
+
+    const member = guild.members.cache.get(newUser.id) ?? (await guild.members.fetch(newUser.id).catch(() => null));
+    if (!member) continue;
+
+    await applyTagRoleState(guild, member, config, true);
+  }
 }
 
 // Repasse sur tous les membres d'une guilde pour rattraper les cas ratés par
 // l'écoute event-par-event (ex: membre déjà tagué avant que le bot rejoigne,
-// ou dont aucun événement n'est jamais arrivé scopé sur cette guilde - voir
-// plus haut). `announce` à false uniquement pour la synchro de démarrage
-// (GuildCreate, qui couvre aussi bien un nouvel ajout du bot que le
-// rechargement de ses guildes au redémarrage) — sinon un simple redémarrage
-// du bot spammerait une annonce publique pour des membres tagués depuis
-// longtemps. La synchro périodique, elle, annonce normalement : à ce
-// moment-là un rôle nouvellement ajouté correspond à un vrai changement
-// récent, pas à un rattrapage d'état existant.
+// ou un membre totalement silencieux sur toutes les guildes partagées avec
+// le bot au moment du changement, qui ne génère donc aucun UserUpdate).
+// `announce` à false uniquement pour la synchro de démarrage (GuildCreate,
+// qui couvre aussi bien un nouvel ajout du bot que le rechargement de ses
+// guildes au redémarrage) — sinon un simple redémarrage du bot spammerait
+// une annonce publique pour des membres tagués depuis longtemps. La synchro
+// périodique, elle, annonce normalement : à ce moment-là un rôle nouvellement
+// ajouté correspond à un vrai changement récent, pas à un rattrapage d'état
+// existant.
 async function syncGuildTagRoles(guild: Guild, announce: boolean) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: guild.id } });
   if (!config?.enabled || !config.roleId) return;
@@ -149,19 +168,13 @@ const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 export const serverTagModule: BotModuleHandler = {
   name: 'serverTag',
   register(client: BotClient) {
-    client.on(Events.GuildMemberUpdate, (_oldMember, newMember) => {
-      if (newMember.user.bot) return;
-      handleMemberUpdate(newMember).catch((err) => console.error('serverTag module failed:', err));
-    });
-
-    // Détecte le cas le plus courant en direct (le membre est actif sur CE
-    // serveur au moment du changement) — nécessite l'intent GuildPresences
-    // (voir index.ts). Ne couvre pas tous les cas, voir le filet de sécurité
-    // périodique plus bas.
-    client.on(Events.PresenceUpdate, (_oldPresence, newPresence) => {
-      const member = newPresence.member;
-      if (!member || member.user.bot) return;
-      handleMemberUpdate(member).catch((err) => console.error('serverTag module (presence) failed:', err));
+    // Couvre le cas en direct. GuildPresences (voir index.ts) reste
+    // nécessaire : c'est ce qui permet à discord.js de détecter le
+    // changement en premier lieu quand le membre n'a d'activité que via son
+    // statut/présence, pas une vraie mise à jour de membre.
+    client.on(Events.UserUpdate, (oldUser, newUser) => {
+      if (newUser.bot) return;
+      syncTagRole(client, oldUser, newUser).catch((err) => console.error('serverTag module failed:', err));
     });
 
     // GuildCreate couvre à la fois un nouvel ajout du bot ET le rechargement
