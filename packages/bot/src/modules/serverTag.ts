@@ -109,6 +109,10 @@ async function applyTagRoleState(guild: Guild, member: GuildMember, config: Serv
 // UserUpdate qui ne se déclenchait donc jamais pour ce cas.
 async function handleMemberUpdate(member: GuildMember) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: member.guild.id } });
+  // Log temporaire — voir les écouteurs dans serverTagModule.register().
+  console.log(
+    `[serverTag] handleMemberUpdate ${member.user.tag} config.enabled=${config?.enabled} config.roleId=${config?.roleId} shouldHaveRole=${displaysTagFor(member.user, member.guild.id)} hasRole=${config?.roleId ? member.roles.cache.has(config.roleId) : 'n/a'}`
+  );
   if (!config?.enabled || !config.roleId) return;
   await applyTagRoleState(member.guild, member, config, true);
 }
@@ -143,6 +147,11 @@ export const serverTagModule: BotModuleHandler = {
   register(client: BotClient) {
     client.on(Events.GuildMemberUpdate, (_oldMember, newMember) => {
       if (newMember.user.bot) return;
+      // Log temporaire — à retirer une fois confirmé si/quand cet événement
+      // se déclenche réellement pour un changement de tag de serveur.
+      console.log(
+        `[serverTag] GuildMemberUpdate ${newMember.user.tag} primaryGuild=${JSON.stringify(newMember.user.primaryGuild)}`
+      );
       handleMemberUpdate(newMember).catch((err) => console.error('serverTag module failed:', err));
     });
 
@@ -154,6 +163,10 @@ export const serverTagModule: BotModuleHandler = {
     client.on(Events.PresenceUpdate, (_oldPresence, newPresence) => {
       const member = newPresence.member;
       if (!member || member.user.bot) return;
+      // Log temporaire — voir ci-dessus.
+      console.log(
+        `[serverTag] PresenceUpdate ${member.user.tag} primaryGuild=${JSON.stringify(member.user.primaryGuild)}`
+      );
       handleMemberUpdate(member).catch((err) => console.error('serverTag module (presence) failed:', err));
     });
 
