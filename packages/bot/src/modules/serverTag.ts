@@ -111,7 +111,7 @@ async function handleMemberUpdate(member: GuildMember) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: member.guild.id } });
   // Log temporaire — voir les écouteurs dans serverTagModule.register().
   console.log(
-    `[serverTag] handleMemberUpdate ${member.user.tag} config.enabled=${config?.enabled} config.roleId=${config?.roleId} shouldHaveRole=${displaysTagFor(member.user, member.guild.id)} hasRole=${config?.roleId ? member.roles.cache.has(config.roleId) : 'n/a'}`
+    `[serverTag] handleMemberUpdate ${member.user.tag} guild=${member.guild.name}(${member.guild.id}) config.enabled=${config?.enabled} config.roleId=${config?.roleId} shouldHaveRole=${displaysTagFor(member.user, member.guild.id)} hasRole=${config?.roleId ? member.roles.cache.has(config.roleId) : 'n/a'}`
   );
   if (!config?.enabled || !config.roleId) return;
   await applyTagRoleState(member.guild, member, config, true);
