@@ -47,6 +47,13 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
+    // Requis pour détecter le tag de serveur (primaryGuild) des AUTRES
+    // membres (voir modules/serverTag.ts) : Discord ne relaie ce genre de
+    // changement de profil global via GUILD_MEMBER_UPDATE que dans certains
+    // cas, le canal fiable est PRESENCE_UPDATE — qui nécessite cette intent
+    // privilégiée (à activer aussi côté Discord Developer Portal, onglet Bot
+    // → Privileged Gateway Intents → "Presence Intent").
+    GatewayIntentBits.GuildPresences,
   ],
   // Nécessaires pour recevoir les événements de réaction (ajout/retrait de
   // rôle) même sur un message posté avant le démarrage du bot, donc jamais

@@ -146,6 +146,17 @@ export const serverTagModule: BotModuleHandler = {
       handleMemberUpdate(newMember).catch((err) => console.error('serverTag module failed:', err));
     });
 
+    // Canal principal pour détecter un changement de tag chez un AUTRE
+    // membre — GUILD_MEMBER_UPDATE ne suffisait pas en pratique (voir
+    // GatewayIntentBits.GuildPresences dans index.ts). `newPresence.member`
+    // est déjà patché avec les données à jour au moment où cet événement
+    // est émis (absent seulement si le membre n'est plus en cache).
+    client.on(Events.PresenceUpdate, (_oldPresence, newPresence) => {
+      const member = newPresence.member;
+      if (!member || member.user.bot) return;
+      handleMemberUpdate(member).catch((err) => console.error('serverTag module (presence) failed:', err));
+    });
+
     // GuildCreate couvre à la fois un nouvel ajout du bot ET le rechargement
     // de toutes ses guildes au démarrage — un seul écouteur suffit pour
     // "quand il arrive" (rejoint ou redémarre) dans les deux cas.
