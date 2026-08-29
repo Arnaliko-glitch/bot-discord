@@ -102,29 +102,31 @@ async function applyTagRoleState(guild: Guild, member: GuildMember, config: Serv
   }
 }
 
-// Discord n'envoie l'événement USER_UPDATE que pour l'utilisateur du bot
-// lui-même — les changements sur le profil des AUTRES membres (dont
-// primaryGuild, le tag de serveur) remontent via GUILD_MEMBER_UPDATE à la
-// place (déjà reçu grâce à l'intent GuildMembers), pas besoin d'écouter
-// UserUpdate qui ne se déclenchait donc jamais pour ce cas.
+// Les événements en direct (GuildMemberUpdate, PresenceUpdate) ne se
+// déclenchent qu'à l'occasion d'une activité quelconque du membre (message,
+// changement de statut...) sur CE serveur précis — un membre resté silencieux
+// ici juste après avoir changé son tag peut ne générer aucun événement scopé
+// sur cette guilde avant longtemps, même si le bot partage bien un autre
+// serveur plus actif avec lui entre-temps (vérifié en pratique : événements
+// reçus, mais scopés sur l'autre guilde). D'où la resynchronisation
+// périodique ci-dessous en filet de sécurité, en plus de l'écoute en direct.
 async function handleMemberUpdate(member: GuildMember) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: member.guild.id } });
-  // Log temporaire — voir les écouteurs dans serverTagModule.register().
-  console.log(
-    `[serverTag] handleMemberUpdate ${member.user.tag} guild=${member.guild.name}(${member.guild.id}) config.enabled=${config?.enabled} config.roleId=${config?.roleId} shouldHaveRole=${displaysTagFor(member.user, member.guild.id)} hasRole=${config?.roleId ? member.roles.cache.has(config.roleId) : 'n/a'}`
-  );
   if (!config?.enabled || !config.roleId) return;
   await applyTagRoleState(member.guild, member, config, true);
 }
 
 // Repasse sur tous les membres d'une guilde pour rattraper les cas ratés par
 // l'écoute event-par-event (ex: membre déjà tagué avant que le bot rejoigne,
-// ou hors ligne au moment du changement) — appelée à chaque arrivée sur une
-// guilde (GuildCreate, qui couvre aussi bien un nouvel ajout que le rechargement
-// de la liste des guildes au démarrage). Sans effet si le module est désactivé
-// ou si aucun rôle n'est configuré, pour ne pas faire un fetch complet des
-// membres inutilement.
-async function syncGuildTagRoles(guild: Guild) {
+// ou dont aucun événement n'est jamais arrivé scopé sur cette guilde - voir
+// plus haut). `announce` à false uniquement pour la synchro de démarrage
+// (GuildCreate, qui couvre aussi bien un nouvel ajout du bot que le
+// rechargement de ses guildes au redémarrage) — sinon un simple redémarrage
+// du bot spammerait une annonce publique pour des membres tagués depuis
+// longtemps. La synchro périodique, elle, annonce normalement : à ce
+// moment-là un rôle nouvellement ajouté correspond à un vrai changement
+// récent, pas à un rattrapage d'état existant.
+async function syncGuildTagRoles(guild: Guild, announce: boolean) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: guild.id } });
   if (!config?.enabled || !config.roleId) return;
 
@@ -136,9 +138,11 @@ async function syncGuildTagRoles(guild: Guild) {
 
   for (const member of members.values()) {
     if (member.user.bot) continue;
-    await applyTagRoleState(guild, member, config, false);
+    await applyTagRoleState(guild, member, config, announce);
   }
 }
+
+const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 // Donne/retire un rôle selon que le membre affiche ou non le tag de CE
 // serveur sur son profil Discord.
@@ -147,26 +151,16 @@ export const serverTagModule: BotModuleHandler = {
   register(client: BotClient) {
     client.on(Events.GuildMemberUpdate, (_oldMember, newMember) => {
       if (newMember.user.bot) return;
-      // Log temporaire — à retirer une fois confirmé si/quand cet événement
-      // se déclenche réellement pour un changement de tag de serveur.
-      console.log(
-        `[serverTag] GuildMemberUpdate ${newMember.user.tag} primaryGuild=${JSON.stringify(newMember.user.primaryGuild)}`
-      );
       handleMemberUpdate(newMember).catch((err) => console.error('serverTag module failed:', err));
     });
 
-    // Canal principal pour détecter un changement de tag chez un AUTRE
-    // membre — GUILD_MEMBER_UPDATE ne suffisait pas en pratique (voir
-    // GatewayIntentBits.GuildPresences dans index.ts). `newPresence.member`
-    // est déjà patché avec les données à jour au moment où cet événement
-    // est émis (absent seulement si le membre n'est plus en cache).
+    // Détecte le cas le plus courant en direct (le membre est actif sur CE
+    // serveur au moment du changement) — nécessite l'intent GuildPresences
+    // (voir index.ts). Ne couvre pas tous les cas, voir le filet de sécurité
+    // périodique plus bas.
     client.on(Events.PresenceUpdate, (_oldPresence, newPresence) => {
       const member = newPresence.member;
       if (!member || member.user.bot) return;
-      // Log temporaire — voir ci-dessus.
-      console.log(
-        `[serverTag] PresenceUpdate ${member.user.tag} primaryGuild=${JSON.stringify(member.user.primaryGuild)}`
-      );
       handleMemberUpdate(member).catch((err) => console.error('serverTag module (presence) failed:', err));
     });
 
@@ -174,7 +168,13 @@ export const serverTagModule: BotModuleHandler = {
     // de toutes ses guildes au démarrage — un seul écouteur suffit pour
     // "quand il arrive" (rejoint ou redémarre) dans les deux cas.
     client.on(Events.GuildCreate, (guild) => {
-      syncGuildTagRoles(guild).catch((err) => console.error('serverTag module (sync) failed:', err));
+      syncGuildTagRoles(guild, false).catch((err) => console.error('serverTag module (sync) failed:', err));
     });
+
+    setInterval(() => {
+      for (const guild of client.guilds.cache.values()) {
+        syncGuildTagRoles(guild, true).catch((err) => console.error('serverTag module (periodic sync) failed:', err));
+      }
+    }, PERIODIC_SYNC_INTERVAL_MS);
   },
 };
