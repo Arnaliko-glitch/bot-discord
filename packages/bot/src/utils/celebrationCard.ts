@@ -1,4 +1,5 @@
 import { createCanvas, loadImage, type Image, type SKRSContext2D } from '@napi-rs/canvas';
+import type { HexColorString, Role } from 'discord.js';
 import { FONT_STACK } from './fonts.js';
 
 const WIDTH = 525;
@@ -6,13 +7,27 @@ const HEIGHT = 155;
 
 export interface CelebrationCardOptions {
   avatarUrl: string;
-  accentColor: string;
+  // Un seul hex ("#RRGGBB") pour une couleur pleine, plusieurs pour un
+  // dégradé (ex: rôle Discord à couleurs primaire/secondaire/tertiaire).
+  accentColor: string | string[];
   // Ex: "vous avez atteint" / "vous recevez le rôle"
   line1: string;
   // Ex: "le niveau 5" / "@xp1" — affiché en gras dans accentColor.
   line2: string;
   // Emoji Unicode affiché en grand à droite (ex: "🎉") — optionnel.
   emoji?: string;
+}
+
+// Couleur(s) d'un rôle Discord pour accentColor — un rôle "dégradé" a
+// colors.secondaryColor/tertiaryColor en plus de primaryColor (voir aussi
+// Role#colors dans discord.js, qui remplace l'ancien Role#color unique).
+// Partagée entre modules/serverTag.ts et modules/levels/rewards.ts.
+export function roleAccentColors(role: Role | null | undefined, fallback: HexColorString): HexColorString[] {
+  if (!role?.colors.primaryColor) return [fallback];
+  const hex = (n: number): HexColorString => `#${n.toString(16).padStart(6, '0')}`;
+  return [role.colors.primaryColor, role.colors.secondaryColor, role.colors.tertiaryColor]
+    .filter((c): c is number => typeof c === 'number')
+    .map(hex);
 }
 
 // Image Twemoji (même style que Discord) plutôt qu'une police emoji système
@@ -57,6 +72,16 @@ function truncateToWidth(ctx: SKRSContext2D, text: string, maxWidth: number): st
     else high = mid - 1;
   }
   return text.slice(0, low) + ellipsis;
+}
+
+// Couleur pleine si un seul hex fourni, dégradé horizontal réparti sur toute
+// la largeur du texte sinon — un rôle Discord "dégradé" (colors.secondaryColor
+// / tertiaryColor) n'était sinon rendu qu'avec sa première couleur.
+function textFillStyle(ctx: SKRSContext2D, colors: string[], x: number, width: number, y: number) {
+  if (colors.length <= 1) return colors[0] ?? '#dc2626';
+  const gradient = ctx.createLinearGradient(x, y, x + width, y);
+  colors.forEach((color, i) => gradient.addColorStop(i / (colors.length - 1), color));
+  return gradient;
 }
 
 // Un seul emoji est réellement utilisé pour l'instant (🎉) — évite de le
@@ -146,9 +171,12 @@ export async function generateCelebrationCard({
   ctx.fillText(line1, textX, cursorY + SUBTITLE_SIZE * ASCENT_RATIO, maxTextWidth);
   cursorY += SUBTITLE_SIZE + GAP_SUBTITLE_LINE2;
 
-  ctx.fillStyle = accentColor;
   ctx.font = `${LINE2_SIZE}px ${FONT_STACK}`;
-  ctx.fillText(truncateToWidth(ctx, line2, maxTextWidth), textX, cursorY + LINE2_SIZE * ASCENT_RATIO, maxTextWidth);
+  const line2Text = truncateToWidth(ctx, line2, maxTextWidth);
+  const line2Y = cursorY + LINE2_SIZE * ASCENT_RATIO;
+  const colors = Array.isArray(accentColor) ? accentColor : [accentColor];
+  ctx.fillStyle = textFillStyle(ctx, colors, textX, ctx.measureText(line2Text).width, line2Y);
+  ctx.fillText(line2Text, textX, line2Y, maxTextWidth);
 
   if (emoji) {
     const emojiImage = await loadEmojiImage(emoji);

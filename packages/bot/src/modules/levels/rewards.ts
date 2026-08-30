@@ -2,7 +2,7 @@ import { AttachmentBuilder, EmbedBuilder, type Guild, type GuildMember, type Gui
 import crypto from 'node:crypto';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { LevelRole, XpSettings } from '@discord-bot-dashboard/database';
-import { generateCelebrationCard } from '../../utils/celebrationCard.js';
+import { generateCelebrationCard, roleAccentColors } from '../../utils/celebrationCard.js';
 
 export const REWARD_FALLBACK_ACCENT = '#dc2626';
 
@@ -70,17 +70,19 @@ export async function applyLevelRewards(
   for (const reward of rewards) {
     const role = await member.guild.roles.fetch(reward.roleId).catch(() => null);
     if (!role) continue;
-    const accentColor = role.color ? role.hexColor : REWARD_FALLBACK_ACCENT;
+    const accentColors = roleAccentColors(role, REWARD_FALLBACK_ACCENT);
     const description = applyPlaceholders(settings.rewardMessage, member, reward.level);
     const card = await generateCelebrationCard({
       avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 128 }),
-      accentColor,
+      accentColor: accentColors,
       line1: 'vous recevez le rôle',
       line2: role.name,
       emoji: '🎉',
     });
     const attachment = new AttachmentBuilder(card, { name: 'reward.png' });
-    const embed = new EmbedBuilder().setColor(accentColor).setImage('attachment://reward.png');
+    // L'embed Discord ne peut avoir qu'une seule couleur pleine — pas de
+    // dégradé possible ici, contrairement à la carte dessinée au-dessus.
+    const embed = new EmbedBuilder().setColor(accentColors[0]).setImage('attachment://reward.png');
     await channel.send({ content: description, embeds: [embed], files: [attachment] }).catch(() => undefined);
   }
 }

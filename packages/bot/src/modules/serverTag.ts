@@ -2,7 +2,7 @@ import { AttachmentBuilder, EmbedBuilder, Events, type Guild, type GuildMember, 
 import { prisma } from '@discord-bot-dashboard/database';
 import type { ServerTagConfig } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../client.js';
-import { generateCelebrationCard } from '../utils/celebrationCard.js';
+import { generateCelebrationCard, roleAccentColors } from '../utils/celebrationCard.js';
 
 const ANNOUNCE_FALLBACK_ACCENT = '#dc2626';
 
@@ -50,18 +50,20 @@ export async function announceTagReward(guild: Guild, member: GuildMember, confi
 
   const role = await guild.roles.fetch(config.roleId).catch(() => null);
   const roleName = role?.name ?? 'le rôle';
-  const accentColor = role?.color ? role.hexColor : ANNOUNCE_FALLBACK_ACCENT;
+  const accentColors = roleAccentColors(role, ANNOUNCE_FALLBACK_ACCENT);
   const content = config.announceMessage.replaceAll('{user}', `<@${member.id}>`);
 
   const card = await generateCelebrationCard({
     avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 128 }),
-    accentColor,
+    accentColor: accentColors,
     line1: 'vous recevez le rôle',
     line2: roleName,
     emoji: '🎉',
   });
   const attachment = new AttachmentBuilder(card, { name: 'tag-reward.png' });
-  const embed = new EmbedBuilder().setColor(accentColor).setImage('attachment://tag-reward.png');
+  // L'embed Discord ne peut avoir qu'une seule couleur pleine — pas de
+  // dégradé possible ici, contrairement à la carte dessinée au-dessus.
+  const embed = new EmbedBuilder().setColor(accentColors[0]).setImage('attachment://tag-reward.png');
 
   await channel.send({ content, embeds: [embed], files: [attachment] }).catch((err) => console.error('Annonce tag du serveur échouée:', err));
 }
