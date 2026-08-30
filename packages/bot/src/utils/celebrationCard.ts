@@ -23,9 +23,29 @@ function emojiToCodepoints(emoji: string): string {
   return [...emoji].map((char) => char.codePointAt(0)!.toString(16)).join('-');
 }
 
+// Réduit la taille de police par pas de 1px jusqu'à ce que le texte rentre
+// dans maxWidth (ou jusqu'à minSize) — préféré à une troncature directe pour
+// un nom de rôle un peu long : on garde le nom entier, juste plus petit,
+// plutôt que de couper avec "…".
+function fitFontSize(
+  ctx: SKRSContext2D,
+  text: string,
+  fontStack: string,
+  maxSize: number,
+  minSize: number,
+  maxWidth: number
+): number {
+  for (let size = maxSize; size > minSize; size--) {
+    ctx.font = `${size}px ${fontStack}`;
+    if (ctx.measureText(text).width <= maxWidth) return size;
+  }
+  return minSize;
+}
+
 // Coupe le texte (avec une ellipse) s'il dépasse maxWidth avec la police
-// actuellement définie sur ctx — un nom de rôle peut aller jusqu'à 100
-// caractères côté Discord, largement de quoi déborder du cadre sinon.
+// actuellement définie sur ctx — dernier recours si même la taille minimum
+// de fitFontSize ne suffit pas (nom de rôle jusqu'à 100 caractères côté
+// Discord, largement de quoi déborder du cadre même en petit).
 function truncateToWidth(ctx: SKRSContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
   const ellipsis = '…';
@@ -103,10 +123,15 @@ export async function generateCelebrationCard({
   // vraiment le bloc dans le cadre.
   const TITLE_SIZE = 35;
   const SUBTITLE_SIZE = 17;
-  const LINE2_SIZE = 29;
+  const LINE2_MAX_SIZE = 29;
+  const LINE2_MIN_SIZE = 18;
   const GAP_TITLE_SUBTITLE = 6;
   const GAP_SUBTITLE_LINE2 = 10;
   const ASCENT_RATIO = 0.8;
+
+  // Déterminé avant le calcul du bloc pour que le centrage vertical tienne
+  // compte de la taille réelle (potentiellement réduite) de line2.
+  const LINE2_SIZE = fitFontSize(ctx, line2, FONT_STACK, LINE2_MAX_SIZE, LINE2_MIN_SIZE, maxTextWidth);
 
   const blockHeight = TITLE_SIZE + GAP_TITLE_SUBTITLE + SUBTITLE_SIZE + GAP_SUBTITLE_LINE2 + LINE2_SIZE;
   let cursorY = (HEIGHT - blockHeight) / 2;
