@@ -1,4 +1,4 @@
-import { createCanvas, loadImage, type Image } from '@napi-rs/canvas';
+import { createCanvas, loadImage, type Image, type SKRSContext2D } from '@napi-rs/canvas';
 import { FONT_STACK } from './fonts.js';
 
 const WIDTH = 525;
@@ -21,6 +21,22 @@ const TWEMOJI_PNG_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/ass
 
 function emojiToCodepoints(emoji: string): string {
   return [...emoji].map((char) => char.codePointAt(0)!.toString(16)).join('-');
+}
+
+// Coupe le texte (avec une ellipse) s'il dépasse maxWidth avec la police
+// actuellement définie sur ctx — un nom de rôle peut aller jusqu'à 100
+// caractères côté Discord, largement de quoi déborder du cadre sinon.
+function truncateToWidth(ctx: SKRSContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const ellipsis = '…';
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (ctx.measureText(text.slice(0, mid) + ellipsis).width <= maxWidth) low = mid;
+    else high = mid - 1;
+  }
+  return text.slice(0, low) + ellipsis;
 }
 
 // Un seul emoji est réellement utilisé pour l'instant (🎉) — évite de le
@@ -77,27 +93,42 @@ export async function generateCelebrationCard({
     // Avatar injoignable : on continue sans (fond seul).
   }
 
-  const emojiReserved = emoji ? 90 : 24;
+  const emojiReserved = emoji ? 78 : 24;
   const textX = avatarX + avatarSize + 34;
   const maxTextWidth = WIDTH - textX - emojiReserved;
   ctx.textBaseline = 'alphabetic';
 
+  // Bloc de 3 lignes centré verticalement (même technique que
+  // welcomeBanner.ts) plutôt que des positions Y fixes qui ne centraient pas
+  // vraiment le bloc dans le cadre.
+  const TITLE_SIZE = 35;
+  const SUBTITLE_SIZE = 17;
+  const LINE2_SIZE = 29;
+  const GAP_TITLE_SUBTITLE = 6;
+  const GAP_SUBTITLE_LINE2 = 10;
+  const ASCENT_RATIO = 0.8;
+
+  const blockHeight = TITLE_SIZE + GAP_TITLE_SUBTITLE + SUBTITLE_SIZE + GAP_SUBTITLE_LINE2 + LINE2_SIZE;
+  let cursorY = (HEIGHT - blockHeight) / 2;
+
   ctx.fillStyle = '#ffffff';
-  ctx.font = `35px ${FONT_STACK}`;
-  ctx.fillText('Félicitations !', textX, 56, maxTextWidth);
+  ctx.font = `${TITLE_SIZE}px ${FONT_STACK}`;
+  ctx.fillText('Félicitations !', textX, cursorY + TITLE_SIZE * ASCENT_RATIO, maxTextWidth);
+  cursorY += TITLE_SIZE + GAP_TITLE_SUBTITLE;
 
   ctx.fillStyle = '#9ca3af';
-  ctx.font = `17px ${FONT_STACK}`;
-  ctx.fillText(line1, textX, 82, maxTextWidth);
+  ctx.font = `${SUBTITLE_SIZE}px ${FONT_STACK}`;
+  ctx.fillText(line1, textX, cursorY + SUBTITLE_SIZE * ASCENT_RATIO, maxTextWidth);
+  cursorY += SUBTITLE_SIZE + GAP_SUBTITLE_LINE2;
 
   ctx.fillStyle = accentColor;
-  ctx.font = `29px ${FONT_STACK}`;
-  ctx.fillText(line2, textX, 116, maxTextWidth);
+  ctx.font = `${LINE2_SIZE}px ${FONT_STACK}`;
+  ctx.fillText(truncateToWidth(ctx, line2, maxTextWidth), textX, cursorY + LINE2_SIZE * ASCENT_RATIO, maxTextWidth);
 
   if (emoji) {
     const emojiImage = await loadEmojiImage(emoji);
     if (emojiImage) {
-      const emojiSize = 64;
+      const emojiSize = 52;
       ctx.drawImage(emojiImage, WIDTH - emojiSize - 26, (HEIGHT - emojiSize) / 2, emojiSize, emojiSize);
     }
   }
