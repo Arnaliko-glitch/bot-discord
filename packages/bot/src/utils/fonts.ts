@@ -35,8 +35,13 @@ GlobalFonts.registerFromPath(
 // Pile de polices à utiliser pour tout ctx.font dessinant du texte fourni
 // par un utilisateur (pseudo, nom de rôle...) — Skia (moteur de
 // @napi-rs/canvas) bascule automatiquement sur la police suivante de la
-// liste pour les caractères absents de la précédente.
-export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY}"`;
+// liste pour les caractères absents de la précédente. Twemoji juste après
+// Poppins (pas en dernier) : Noto Sans a aussi un glyphe (en noir/blanc, pas
+// en couleur) pour pas mal de symboles emoji courants (étoiles, cœurs...),
+// et Skia prend la PREMIÈRE police qui couvre le caractère, pas la plus
+// jolie — Twemoji doit donc passer avant, sinon certains emoji s'affichaient
+// en noir/blanc au lieu de la version colorée attendue.
+export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}"`;
 
 // Même repli, mais sans Poppins en tête — aucune des polices de secours
 // n'a d'équivalent gras (@napi-rs/canvas ne sait pas synthétiser un gras
@@ -44,7 +49,7 @@ export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "$
 // rendu à moitié gras/moitié fin. Utilisée quand le texte contient des
 // caractères que Poppins ne couvre pas, pour rester visuellement cohérent
 // (tout en fin) plutôt qu'à moitié gras.
-const NON_BOLD_FONT_STACK = `"${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY}"`;
+const NON_BOLD_FONT_STACK = `"${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}"`;
 
 // Plage de caractères que Poppins couvre correctement : latin de base
 // ( -ɏ), latin étendu additionnel (Ḁ-ỿ) et ponctuation
