@@ -5,6 +5,7 @@ import { panelTicketCommand } from './panelTicket.js';
 import { statistiquesCommand } from './statistiques.js';
 import { testTagLogCommand } from './testTagLog.js';
 import { testAddXpCommand } from './testAddXp.js';
+import { testResetXpCommand } from './testResetXp.js';
 import { testTagAnnounceCommand } from './testTagAnnounce.js';
 import { testCardsCommand } from './testCards.js';
 
@@ -17,6 +18,7 @@ const devCommands: SlashCommand[] =
         panelTicketCommand,
         testTagLogCommand,
         testAddXpCommand,
+        testResetXpCommand,
         testTagAnnounceCommand,
         testCardsCommand,
       ];
