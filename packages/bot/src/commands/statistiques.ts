@@ -19,25 +19,22 @@ function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-// Couleurs ANSI supportées par les blocs de code Discord (```ansi) — la
-// seule façon d'obtenir du texte réellement coloré dans un message.
-const ESC = String.fromCharCode(27);
-const ANSI_GREEN = 32;
-const ANSI_RED = 31;
-const ANSI_WHITE = 37;
-
-function ansi(code: number, text: string, bold = false): string {
-  return `${ESC}[${bold ? '1;' : ''}${code}m${text}${ESC}[0m`;
+// Les blocs de code colorés (```ansi) ne sont rendus qu'sur Discord
+// desktop/web — sur mobile, le langage n'est pas reconnu et le message perd
+// à la fois la couleur ET l'alignement monospace (police proportionnelle à
+// la place). Un émoji rond coloré, lui, s'affiche identique partout.
+function statusDot(net: number): string {
+  return net > 0 ? '🟢' : net < 0 ? '🔴' : '⚪';
 }
 
 // Grille compacte plutôt qu'une liste de 30 lignes — chaque case "dd/mm ±N"
-// alignée en colonnes, coloriée en ANSI (vert/rouge/blanc selon le signe).
+// alignée en colonnes (bloc de code simple, sans langage — fiable sur
+// mobile comme sur desktop).
 function buildActivityGrid(days: { date: Date; net: number }[]): string {
   const cells = days.map((d) => {
     const label = d.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
     const value = (d.net > 0 ? `+${d.net}` : `${d.net}`).padStart(2, ' ');
-    const color = d.net > 0 ? ANSI_GREEN : d.net < 0 ? ANSI_RED : ANSI_WHITE;
-    return `${label} ${ansi(color, value)}`;
+    return `${label} ${statusDot(d.net)}${value}`;
   });
 
   // Remplissage colonne par colonne (la colonne 1 lit 20/07, 21/07, 22/07...
@@ -54,7 +51,7 @@ function buildActivityGrid(days: { date: Date; net: number }[]): string {
     }
     rows.push(line.join('   '));
   }
-  return '```ansi\n' + rows.join('\n') + '\n```';
+  return '```\n' + rows.join('\n') + '\n```';
 }
 
 // Réservée aux admins ("Gérer le serveur", même permission que l'accès au
@@ -101,23 +98,14 @@ export const statistiquesCommand: SlashCommand = {
     });
 
     const netTotal = days.reduce((sum, d) => sum + d.net, 0);
-    const netTotalColor = netTotal > 0 ? ANSI_GREEN : netTotal < 0 ? ANSI_RED : ANSI_WHITE;
     const netTotalText = netTotal > 0 ? `+${netTotal}` : `${netTotal}`;
 
     const embed = new EmbedBuilder()
       .setColor(netTotal > 0 ? 0x57f287 : netTotal < 0 ? 0xed4245 : 0x99aab5)
       .setTitle('📊 Statistiques du serveur (30 jours)')
       .addFields(
-        {
-          name: 'Membres',
-          value: '```ansi\n' + ansi(ANSI_WHITE, memberCount.toLocaleString('fr-FR'), true) + '\n```',
-          inline: true,
-        },
-        {
-          name: `Variation (${ACTIVITY_DAYS} jours)`,
-          value: '```ansi\n' + ansi(netTotalColor, netTotalText, true) + '\n```',
-          inline: true,
-        }
+        { name: 'Membres', value: `**${memberCount.toLocaleString('fr-FR')}**`, inline: true },
+        { name: `Variation (${ACTIVITY_DAYS} jours)`, value: `${statusDot(netTotal)} **${netTotalText}**`, inline: true }
       )
       .setDescription(buildActivityGrid(days))
       .setFooter({ text: interaction.client.user.username, iconURL: interaction.client.user.displayAvatarURL() })
