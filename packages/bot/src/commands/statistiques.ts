@@ -19,22 +19,23 @@ function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-// Les blocs de code colorés (```ansi) ne sont rendus qu'sur Discord
-// desktop/web — sur mobile, le langage n'est pas reconnu et le message perd
-// à la fois la couleur ET l'alignement monospace (police proportionnelle à
-// la place). Un émoji rond coloré, lui, s'affiche identique partout.
+// Un émoji rond coloré s'affiche pareil sur mobile et desktop (contrairement
+// aux blocs de code ```ansi, pas reconnus sur mobile) — mais UNIQUEMENT en
+// dehors d'un bloc de code aligné en colonnes : sa largeur de rendu n'est
+// pas celle d'un caractère monospace, ça décale toute la grille. Réservé au
+// champ "Variation" (une seule valeur, rien à aligner autour).
 function statusDot(net: number): string {
   return net > 0 ? '🟢' : net < 0 ? '🔴' : '⚪';
 }
 
 // Grille compacte plutôt qu'une liste de 30 lignes — chaque case "dd/mm ±N"
-// alignée en colonnes (bloc de code simple, sans langage — fiable sur
-// mobile comme sur desktop).
+// alignée en colonnes (bloc de code simple, sans langage ni émoji, pour un
+// alignement fiable sur mobile comme sur desktop — voir statusDot ci-dessus).
 function buildActivityGrid(days: { date: Date; net: number }[]): string {
   const cells = days.map((d) => {
     const label = d.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
-    const value = (d.net > 0 ? `+${d.net}` : `${d.net}`).padStart(2, ' ');
-    return `${label} ${statusDot(d.net)}${value}`;
+    const value = (d.net > 0 ? `+${d.net}` : `${d.net}`).padStart(3, ' ');
+    return `${label} ${value}`;
   });
 
   // Remplissage colonne par colonne (la colonne 1 lit 20/07, 21/07, 22/07...
