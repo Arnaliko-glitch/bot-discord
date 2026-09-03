@@ -9,7 +9,7 @@ import { prisma } from '@discord-bot-dashboard/database';
 import type { SlashCommand } from './types.js';
 
 const ACTIVITY_DAYS = 30;
-const GRID_COLUMNS = 3;
+const GRID_COLUMNS = 2;
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
