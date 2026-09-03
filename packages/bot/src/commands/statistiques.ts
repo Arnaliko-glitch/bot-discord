@@ -9,7 +9,7 @@ import { prisma } from '@discord-bot-dashboard/database';
 import type { SlashCommand } from './types.js';
 
 const ACTIVITY_DAYS = 30;
-const GRID_COLUMNS = 5;
+const GRID_COLUMNS = 3;
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -20,22 +20,22 @@ function startOfUtcDay(date: Date): Date {
 }
 
 // Un émoji rond coloré s'affiche pareil sur mobile et desktop (contrairement
-// aux blocs de code ```ansi, pas reconnus sur mobile) — mais UNIQUEMENT en
-// dehors d'un bloc de code aligné en colonnes : sa largeur de rendu n'est
-// pas celle d'un caractère monospace, ça décale toute la grille. Réservé au
-// champ "Variation" (une seule valeur, rien à aligner autour).
+// aux blocs de code ```ansi, pas reconnus sur mobile). Sa largeur de rendu
+// n'est pas exactement celle d'un caractère monospace, mais sur 3 colonnes
+// (au lieu de 5) chaque ligne reste assez étroite pour ne plus déborder du
+// cadre de l'embed ni se faire retourner à la ligne par Discord.
 function statusDot(net: number): string {
   return net > 0 ? '🟢' : net < 0 ? '🔴' : '⚪';
 }
 
 // Grille compacte plutôt qu'une liste de 30 lignes — chaque case "dd/mm ±N"
-// alignée en colonnes (bloc de code simple, sans langage ni émoji, pour un
-// alignement fiable sur mobile comme sur desktop — voir statusDot ci-dessus).
+// alignée en colonnes (bloc de code simple, sans langage, pour un alignement
+// fiable sur mobile comme sur desktop).
 function buildActivityGrid(days: { date: Date; net: number }[]): string {
   const cells = days.map((d) => {
     const label = d.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
     const value = (d.net > 0 ? `+${d.net}` : `${d.net}`).padStart(3, ' ');
-    return `${label} ${value}`;
+    return `${label} ${statusDot(d.net)}${value}`;
   });
 
   // Remplissage colonne par colonne (la colonne 1 lit 20/07, 21/07, 22/07...
