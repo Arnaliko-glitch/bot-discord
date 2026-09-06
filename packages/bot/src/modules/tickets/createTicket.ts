@@ -18,19 +18,30 @@ const CHANNEL_ACCESS = [
 // "stylisés" hors alphabet latin (ne laissait autrement que les quelques
 // lettres latines qu'ils contiennent, voire rien du tout).
 function sanitizeChannelName(raw: string): string {
-  const cleaned = raw
+  return raw
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^\p{L}\p{N}_-]/gu, '')
     .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return (cleaned || 'ticket').slice(0, 100);
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
 }
 
 function buildChannelName(format: string, requester: User, requesterMember: GuildMember | null): string {
   const displayName = requesterMember?.displayName ?? requester.username;
-  const name = format.replaceAll('{user.globalname}', displayName).replaceAll('{user.username}', requester.username);
-  return sanitizeChannelName(name);
+  const withDisplayName = sanitizeChannelName(
+    format.replaceAll('{user.globalname}', displayName).replaceAll('{user.username}', requester.username)
+  );
+  if (withDisplayName) return withDisplayName;
+
+  // Un pseudo entièrement fait de symboles (aucune lettre/chiffre dans aucun
+  // alphabet, ex: "⪩ ⪨ ꠹") disparaît complètement au nettoyage — retente
+  // avec le nom d'utilisateur Discord (contraint par leurs propres règles,
+  // bien plus susceptible de survivre) avant de se rabattre sur "ticket".
+  const withUsername = sanitizeChannelName(
+    format.replaceAll('{user.globalname}', requester.username).replaceAll('{user.username}', requester.username)
+  );
+  return withUsername || 'ticket';
 }
 
 // Crée le salon de ticket (permissions, catégorie, message d'ouverture) et
