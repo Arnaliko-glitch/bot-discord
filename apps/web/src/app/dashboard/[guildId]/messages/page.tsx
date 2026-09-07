@@ -71,6 +71,9 @@ export default async function MessagesPage({ params }: { params: { guildId: stri
         buttons: normalizeButtons(m.buttons),
         lastSentMessageId: m.lastSentMessageId,
         lastSentChannelId: m.lastSentChannelId,
+        autoSendEnabled: m.autoSendEnabled,
+        autoSendIntervalMin: m.autoSendIntervalMin,
+        autoSendNextAt: m.autoSendNextAt?.toISOString() ?? null,
       }))}
     />
   );

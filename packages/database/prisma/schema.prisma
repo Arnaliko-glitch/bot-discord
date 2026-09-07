@@ -144,7 +144,15 @@ model SavedMessage {
   lastSentChannelId String?
   lastSentMessageId String?
   buttons           Json?
-  imageUrls         String[] @default([])
+  imageUrls         String[]  @default([])
+  // Renvoie automatiquement ce message (nouveau message à chaque fois, pas
+  // une édition) toutes les autoSendIntervalMin minutes — voir
+  // apps/web/src/lib/auto-send-scheduler.ts. autoSendNextAt est recalculé
+  // par le serveur (jamais depuis le dashboard) à chaque activation ou
+  // changement d'intervalle.
+  autoSendEnabled     Boolean   @default(false)
+  autoSendIntervalMin Int?
+  autoSendNextAt      DateTime?
   Guild             Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId])

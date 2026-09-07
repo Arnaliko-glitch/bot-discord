@@ -5,5 +5,10 @@ export async function register() {
     const { config } = await import('dotenv');
     const path = await import('node:path');
     config({ path: path.resolve(process.cwd(), '../../.env') });
+
+    // Lancé ici (pas dans une route) pour démarrer une seule fois avec le
+    // serveur, plutôt qu'à la première requête reçue.
+    const { startAutoSendScheduler } = await import('@/lib/auto-send-scheduler');
+    startAutoSendScheduler();
   }
 }

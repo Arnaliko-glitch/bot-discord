@@ -59,12 +59,22 @@ export interface MessageData {
   buttons: MessageButtonData[];
   lastSentMessageId: string | null;
   lastSentChannelId: string | null;
+  // Renvoie un nouveau message dans le salon toutes les autoSendIntervalMin
+  // minutes tant que c'est activé — autoSendNextAt (calculé côté serveur,
+  // jamais modifié depuis ici) sert juste à afficher le prochain envoi prévu.
+  autoSendEnabled: boolean;
+  autoSendIntervalMin: number | null;
+  autoSendNextAt: string | null;
 }
 
 const MAX_IMAGES = 10;
 const MAX_EMBEDS = 5;
 // Discord n'autorise que 5 boutons par ligne — on ne gère qu'une seule ligne.
 const MAX_BUTTONS = 5;
+// Doit rester synchronisé avec la même constante côté API
+// (app/api/guilds/[id]/messages/[messageId]/route.ts, qui l'applique
+// réellement) — purement indicatif ici.
+const MIN_AUTO_SEND_INTERVAL_MIN = 5;
 
 const BLANK_BUTTON: MessageButtonData = {
   label: '',
@@ -107,6 +117,9 @@ function emptyDraft(name: string): MessageData {
     buttons: [],
     lastSentMessageId: null,
     lastSentChannelId: null,
+    autoSendEnabled: false,
+    autoSendIntervalMin: null,
+    autoSendNextAt: null,
   };
 }
 
@@ -417,6 +430,59 @@ export function MessagesConfigPage({
               disabled={!draft.id}
             />
           </div>
+
+          {draft.id && (
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Envoi automatique</span>
+              <div className="card space-y-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">Renvoyer ce message périodiquement</p>
+                    <p className="text-xs text-gray-500">Un nouveau message est posté dans le salon à intervalle régulier.</p>
+                  </div>
+                  <Toggle checked={draft.autoSendEnabled} onChange={(v) => update('autoSendEnabled', v)} />
+                </div>
+                {draft.autoSendEnabled && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-white">
+                      <span className="text-gray-400">Toutes les</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={Math.floor((draft.autoSendIntervalMin ?? 0) / 60)}
+                        onChange={(e) => {
+                          const hours = Math.max(0, Number(e.target.value) || 0);
+                          const minutes = (draft.autoSendIntervalMin ?? 0) % 60;
+                          update('autoSendIntervalMin', hours * 60 + minutes);
+                        }}
+                        className="input w-16 text-center"
+                      />
+                      <span className="text-gray-400">h</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={(draft.autoSendIntervalMin ?? 0) % 60}
+                        onChange={(e) => {
+                          const hours = Math.floor((draft.autoSendIntervalMin ?? 0) / 60);
+                          const minutes = Math.max(0, Math.min(59, Number(e.target.value) || 0));
+                          update('autoSendIntervalMin', hours * 60 + minutes);
+                        }}
+                        className="input w-16 text-center"
+                      />
+                      <span className="text-gray-400">min</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Minimum {MIN_AUTO_SEND_INTERVAL_MIN} minutes.</p>
+                    {draft.autoSendNextAt && (
+                      <p className="text-xs text-gray-500">
+                        Prochain envoi : {new Date(draft.autoSendNextAt).toLocaleString('fr-FR')}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Envoi du message</span>
