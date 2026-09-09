@@ -7,8 +7,10 @@ import {
   PermissionsBitField,
   RateLimitError,
   type ButtonInteraction,
+  type GuildMember,
   type Message,
   type ModalSubmitInteraction,
+  type User,
 } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
 import type { Ticket, TicketConfig } from '@discord-bot-dashboard/database';
@@ -195,6 +197,40 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
   ]);
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
+  // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
+  // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
+  // qu'à une fermeture par le staff, pas quand le créateur ferme son propre
+  // ticket (il pourrait vouloir le consulter encore un peu).
+  const autoDelete = config.autoDeleteOnClose && !isSelfClose;
+
+  if (autoDelete) {
+    // Le salon va être supprimé dans l'instant (voir deleteTicket) — pas la
+    // peine de le renommer, de retirer l'accès du créateur, d'écrire un état
+    // "fermé" en base juste avant de supprimer la ligne, ou de poster un
+    // message que personne n'aura le temps de voir : tout ce travail réseau
+    // ne ferait que retarder la vraie suppression pour rien (c'est ce qui
+    // donnait l'impression d'un salon renommé puis supprimé avec un délai).
+    if (reason) {
+      await creator
+        ?.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(CLOSED_COLOR)
+              .setDescription(`🔒 Votre ticket a été fermé par **${closerName}**.\n\n**Raison :** ${reason}`),
+          ],
+        })
+        .catch(() => undefined);
+    }
+    await deleteTicket(
+      interaction,
+      { ...ticket, closedBy: interaction.user.id, closeReason: reason },
+      config,
+      { creator, creatorMember },
+      true
+    );
+    return;
+  }
+
   const newName = swapPrefix(channel.isThread() ? channel.name : (channel as { name: string }).name, REOPENED_PREFIX, CLOSED_PREFIX);
   if ('edit' in channel) {
     const renamed = await renameChannelOrNotify(interaction, channel, newName, ticketTopic('fermé', interaction.user.id));
@@ -219,17 +255,6 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
   );
   if (lines.length > 0) closedEmbed.setDescription(lines.join('\n'));
 
-  // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
-  // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
-  // qu'à une fermeture par le staff, pas quand le créateur ferme son propre
-  // ticket (il pourrait vouloir le consulter encore un peu). Dans ce cas on
-  // n'affiche pas les boutons "Réouvrir/Supprimer" (le salon va disparaître
-  // dans l'instant, ils seraient trompeurs), on saute l'annonce dans le
-  // salon (inutile puisqu'il va être supprimé juste après) et on ne
-  // journalise pas la fermeture séparément — deleteTicket journalise déjà
-  // une seule entrée "supprimé" avec la raison, pas la peine d'en avoir deux.
-  const autoDelete = config.autoDeleteOnClose && !isSelfClose;
-
   await Promise.all([
     'permissionOverwrites' in channel
       ? channel.permissionOverwrites
@@ -240,7 +265,7 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
       where: { id: ticket.id },
       data: { status: 'closed', closedBy: interaction.user.id, closedAt: new Date(), closeReason: reason, updatedAt: new Date() },
     }),
-    autoDelete ? Promise.resolve() : logToTicketChannel(interaction, config, logEmbed),
+    logToTicketChannel(interaction, config, logEmbed),
     reason
       ? creator
           ?.send({
@@ -252,7 +277,7 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
           })
           .catch(() => undefined)
       : Promise.resolve(),
-    updateActionMessage(interaction, ticket, closedEmbed, autoDelete ? undefined : buildClosedStateRow()),
+    updateActionMessage(interaction, ticket, closedEmbed, buildClosedStateRow()),
   ]);
 
   await interaction
@@ -261,11 +286,6 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
       flags: MessageFlags.Ephemeral,
     })
     .catch(() => undefined);
-
-  if (autoDelete) {
-    await deleteTicket(interaction, { ...ticket, closedBy: interaction.user.id, closeReason: reason }, config, true);
-    return;
-  }
 
   const noticeEmbed = new EmbedBuilder()
     .setColor(CLOSED_COLOR)
@@ -341,23 +361,27 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
 // suppression automatique, où ce message de log remplace le message de
 // fermeture (donc doit reprendre sa raison) — pour une suppression manuelle
 // d'un ticket déjà fermé, la raison a déjà été journalisée à la fermeture,
-// pas la peine de la répéter ici.
+// pas la peine de la répéter ici. `prefetched` évite de re-demander à
+// Discord le créateur/membre quand l'appelant (closeTicket) les a déjà.
 export async function deleteTicket(
   interaction: TicketInteraction,
   ticket: Ticket,
   config: TicketConfig,
+  prefetched?: { creator: User | null; creatorMember: GuildMember | null },
   includeCloseReason = false
 ) {
   const channel = interaction.channel;
   if (!channel || !interaction.guild || !('send' in channel)) return;
 
   const deleterName = resolveDisplayName(interaction);
-  const [creator, creatorMember] = await Promise.all([
-    interaction.client.users.cache.get(ticket.creatorId) ??
-      interaction.client.users.fetch(ticket.creatorId).catch(() => null),
-    interaction.guild.members.cache.get(ticket.creatorId) ??
-      interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
-  ]);
+  const [creator, creatorMember] = prefetched
+    ? [prefetched.creator, prefetched.creatorMember]
+    : await Promise.all([
+        interaction.client.users.cache.get(ticket.creatorId) ??
+          interaction.client.users.fetch(ticket.creatorId).catch(() => null),
+        interaction.guild.members.cache.get(ticket.creatorId) ??
+          interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
+      ]);
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
   // Pas de raison affichée si le créateur a fermé lui-même son ticket (aucune
