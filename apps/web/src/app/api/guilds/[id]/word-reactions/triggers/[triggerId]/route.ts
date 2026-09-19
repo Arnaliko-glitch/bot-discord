@@ -29,9 +29,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!phrase) return NextResponse.json({ error: 'Phrase requise' }, { status: 400 });
   if (emojis.length === 0) return NextResponse.json({ error: 'Au moins un emoji requis' }, { status: 400 });
 
-  const updated = await prisma.wordReactionTrigger.update({
-    where: { id: params.triggerId },
-    data: { phrase, emojis },
+  const updated = await prisma.$transaction(async (tx) => {
+    const trigger = await tx.wordReactionTrigger.update({
+      where: { id: params.triggerId },
+      data: { phrase, emojis },
+    });
+    await tx.wordReactionConfig.updateMany({ where: { guildId: params.id }, data: { updatedAt: new Date() } });
+    return trigger;
   });
   return NextResponse.json(updated);
 }
@@ -48,6 +52,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Déclencheur introuvable' }, { status: 404 });
   }
 
-  await prisma.wordReactionTrigger.delete({ where: { id: params.triggerId } });
+  await prisma.$transaction([
+    prisma.wordReactionTrigger.delete({ where: { id: params.triggerId } }),
+    prisma.wordReactionConfig.updateMany({ where: { guildId: params.id }, data: { updatedAt: new Date() } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

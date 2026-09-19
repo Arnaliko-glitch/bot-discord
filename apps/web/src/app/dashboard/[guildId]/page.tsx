@@ -1,4 +1,5 @@
 import { prisma } from '@discord-bot-dashboard/database';
+import { memberStatsDay, memberStatsDayKey, shiftMemberStatsDay } from '@discord-bot-dashboard/shared';
 import { getBotIdentity } from '@/lib/discord-bot';
 import { fetchGuildMembers } from '@/lib/discord-members';
 import { MemberActivityChart, type DailyMemberPoint } from '@/components/MemberActivityChart';
@@ -8,19 +9,14 @@ import { MemberActivityChart, type DailyMemberPoint } from '@/components/MemberA
 // le choix de l'utilisateur (évite un aller-retour serveur à chaque bascule).
 const MAX_ACTIVITY_DAYS = 90;
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 // 90 derniers jours, aujourd'hui inclus (le suivi n'existant que depuis
 // l'ajout de cette fonctionnalité, les jours sans donnée valent simplement 0/0).
-function buildActivityRange(rows: { date: Date; joins: number; leaves: number }[]): DailyMemberPoint[] {
-  const byDate = new Map(rows.map((r) => [isoDate(r.date), r]));
-  const today = new Date();
+function buildActivityRange(rows: { date: Date; joins: number; leaves: number }[], today: Date): DailyMemberPoint[] {
+  const byDate = new Map(rows.map((r) => [memberStatsDayKey(r.date), r]));
   const days: DailyMemberPoint[] = [];
   for (let i = MAX_ACTIVITY_DAYS - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
-    const key = isoDate(d);
+    const d = shiftMemberStatsDay(today, -i);
+    const key = memberStatsDayKey(d);
     const row = byDate.get(key);
     days.push({ date: key, joins: row?.joins ?? 0, leaves: row?.leaves ?? 0 });
   }
@@ -28,21 +24,20 @@ function buildActivityRange(rows: { date: Date; joins: number; leaves: number }[
 }
 
 export default async function GuildHomePage({ params }: { params: { guildId: string } }) {
-  const rangeStart = new Date();
-  rangeStart.setUTCDate(rangeStart.getUTCDate() - (MAX_ACTIVITY_DAYS - 1));
-  rangeStart.setUTCHours(0, 0, 0, 0);
+  const today = memberStatsDay(new Date());
+  const rangeStart = shiftMemberStatsDay(today, -(MAX_ACTIVITY_DAYS - 1));
 
   const [bot, members, activityRows] = await Promise.all([
     getBotIdentity(),
     fetchGuildMembers(params.guildId),
     prisma.dailyMemberStat.findMany({
-      where: { guildId: params.guildId, date: { gte: rangeStart } },
+      where: { guildId: params.guildId, date: { gte: rangeStart, lte: today } },
       orderBy: { date: 'asc' },
     }),
   ]);
 
   const memberCount = members.filter((m) => !m.user.bot).length;
-  const activity = buildActivityRange(activityRows);
+  const activity = buildActivityRange(activityRows, today);
 
   return (
     <div className="space-y-8">

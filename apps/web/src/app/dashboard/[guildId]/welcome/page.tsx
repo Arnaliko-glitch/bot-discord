@@ -4,7 +4,7 @@ import { getBotIdentity } from '@/lib/discord-bot';
 import { WelcomeConfigPage } from '@/components/WelcomeConfigPage';
 
 export default async function WelcomePage({ params }: { params: { guildId: string } }) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return null; // le layout parent redirige déjà si non connecté
 
   const [guild, config, bot] = await Promise.all([

@@ -79,6 +79,43 @@ docker compose up -d --build
 docker compose run --rm migrate
 ```
 
+### Journées des statistiques membres
+
+Le bot, `/statistiques` et le dashboard regroupent les arrivées et départs
+selon `Europe/Paris` (UTC+2 en été, UTC+1 en hiver). La colonne
+`DailyMemberStat.date` représente une date civile, encodée à `00:00Z` pour
+servir de clé. Les horodatages réels des autres tables restent en UTC.
+
+Les anciens compteurs ont été regroupés en UTC sans conserver les événements
+individuels. Avant de déployer ce changement sur une base existante, sauvegarder
+la base et reconstruire les journées depuis une source horodatée complète
+(logs/messages d'arrivées et de départs, en excluant les bots). Comparer d'abord
+les totaux de cette source avec les anciens compteurs UTC, puis recalculer les
+jours parisiens, y compris les événements autour des bornes de la période.
+Coordonner le recalcul avec le changement du bot pour éviter les doubles comptes
+ou le mélange des deux fuseaux sur la journée de transition.
+
+Ajouter deux heures aux dates ou aux champs `createdAt`/`updatedAt` ne permet pas
+de retrouver l'heure des événements déjà agrégés. Sans source complète, un
+recalcul exact de l'historique est impossible ; les anciennes valeurs ne doivent
+pas être présentées comme un historique recalculé à l'heure de Paris.
+
+L'outil ponctuel `scripts/apply-member-stats-paris.cjs` prend un audit JSON
+(`guildId`, `rows` d'origine, `events` humains avec `id`, `kind` joins/leaves et
+`at`). À exécuter depuis le répertoire du bot, avec
+`member-stats-paris-plan.cjs` à côté du script : simulation par défaut,
+écriture seulement avec `--apply`. Il vérifie les totaux, refuse les messages
+proches de minuit et les historiques incomplets. Un reliquat sans messages
+peut être conservé uniquement si le dernier incrément `updatedAt` d'origine
+prouve qu'il précède minuit à Paris. L'écriture est transactionnelle et refuse
+un audit devenu obsolète à cause de nouveaux événements ; réutiliser le même
+audit après application ne décale pas une seconde fois les compteurs.
+
+Tests de la reconstruction : `node --test scripts/member-stats-paris-plan.test.cjs`.
+
+Tests des limites de journées et changements d'heure :
+`pnpm --filter @discord-bot-dashboard/shared test`.
+
 ### Sauvegardes
 
 Le service `backup` fait un `pg_dump` complet une fois par jour à heure fixe (`BACKUP_HOUR`, 3h UTC par défaut), sans action manuelle — démarre automatiquement avec `docker compose up -d`, un fichier compressé dans `./backups` sur l'hôte (ex: `discord_dashboard_2026-08-26_03-00-00.sql.gz`), les sauvegardes de plus de `BACKUP_RETENTION_DAYS` jours (7 par défaut) sont supprimées automatiquement.

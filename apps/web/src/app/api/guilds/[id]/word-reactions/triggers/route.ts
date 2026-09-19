@@ -39,8 +39,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!phrase) return NextResponse.json({ error: 'Phrase requise' }, { status: 400 });
   if (emojis.length === 0) return NextResponse.json({ error: 'Au moins un emoji requis' }, { status: 400 });
 
-  const created = await prisma.wordReactionTrigger.create({
-    data: { id: crypto.randomUUID(), guildId: params.id, phrase, emojis },
+  const created = await prisma.$transaction(async (tx) => {
+    const trigger = await tx.wordReactionTrigger.create({
+      data: { id: crypto.randomUUID(), guildId: params.id, phrase, emojis },
+    });
+    await tx.wordReactionConfig.updateMany({ where: { guildId: params.id }, data: { updatedAt: new Date() } });
+    return trigger;
   });
   return NextResponse.json(created);
 }

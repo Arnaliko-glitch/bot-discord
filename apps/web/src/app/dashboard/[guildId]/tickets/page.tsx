@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { TicketsConfigPage } from '@/components/TicketsConfigPage';
 
 export default async function TicketsPage({ params }: { params: { guildId: string } }) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return null; // le layout parent redirige déjà si non connecté
 
   const [guild, config] = await Promise.all([

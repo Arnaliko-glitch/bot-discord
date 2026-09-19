@@ -151,11 +151,7 @@ async function syncGuildTagRoles(guild: Guild, announce: boolean) {
   const config = await prisma.serverTagConfig.findUnique({ where: { guildId: guild.id } });
   if (!config?.enabled || !config.roleId) return;
 
-  const members = await guild.members.fetch().catch((err) => {
-    console.error('Synchronisation tag du serveur échouée (fetch membres):', err);
-    return null;
-  });
-  if (!members) return;
+  const members = await guild.members.fetch();
 
   for (const member of members.values()) {
     if (member.user.bot) continue;
@@ -163,7 +159,37 @@ async function syncGuildTagRoles(guild: Guild, announce: boolean) {
   }
 }
 
-const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const PERIODIC_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const RETRY_BASE_MS = 60_000;
+const RETRY_MAX_MS = PERIODIC_SYNC_INTERVAL_MS;
+const syncFailures = new Map<string, number>();
+const syncInProgress = new Set<string>();
+
+function retryAfterMs(error: unknown, failures: number): number {
+  const explicit = typeof error === 'object' && error !== null && 'data' in error
+    ? Number((error as { data?: { retry_after?: unknown } }).data?.retry_after) * 1000
+    : 0;
+  return Math.min(RETRY_MAX_MS, Math.max(explicit || 0, RETRY_BASE_MS * 2 ** Math.min(failures, 8)));
+}
+
+function scheduleGuildSync(guild: Guild, announce: boolean, delayMs = 0) {
+  setTimeout(async () => {
+    if (syncInProgress.has(guild.id)) return;
+    syncInProgress.add(guild.id);
+    try {
+      await syncGuildTagRoles(guild, announce);
+      syncFailures.delete(guild.id);
+    } catch (error) {
+      const failures = (syncFailures.get(guild.id) ?? 0) + 1;
+      syncFailures.set(guild.id, failures);
+      const retryMs = retryAfterMs(error, failures);
+      console.error(`Synchronisation tag du serveur échouée, nouvel essai dans ${Math.ceil(retryMs / 1000)}s:`, error);
+      scheduleGuildSync(guild, announce, retryMs);
+    } finally {
+      syncInProgress.delete(guild.id);
+    }
+  }, delayMs);
+}
 
 // Donne/retire un rôle selon que le membre affiche ou non le tag de CE
 // serveur sur son profil Discord.
@@ -183,12 +209,12 @@ export const serverTagModule: BotModuleHandler = {
     // de toutes ses guildes au démarrage — un seul écouteur suffit pour
     // "quand il arrive" (rejoint ou redémarre) dans les deux cas.
     client.on(Events.GuildCreate, (guild) => {
-      syncGuildTagRoles(guild, false).catch((err) => console.error('serverTag module (sync) failed:', err));
+      scheduleGuildSync(guild, false);
     });
 
     setInterval(() => {
       for (const guild of client.guilds.cache.values()) {
-        syncGuildTagRoles(guild, true).catch((err) => console.error('serverTag module (periodic sync) failed:', err));
+        scheduleGuildSync(guild, true);
       }
     }, PERIODIC_SYNC_INTERVAL_MS);
   },

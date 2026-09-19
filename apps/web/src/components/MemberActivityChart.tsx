@@ -106,7 +106,7 @@ export function MemberActivityChart({ memberCount, data }: { memberCount: number
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-white">Arrivées et départs — {period} derniers jours</h2>
-          <p className="text-xs text-gray-500">Variation nette par jour (arrivées moins départs)</p>
+          <p className="text-xs text-gray-500">Variation nette par jour (arrivées moins départs) · Heure de Paris</p>
         </div>
         <div className="flex rounded-lg border border-white/10 p-0.5">
           {PERIODS.map((p) => (

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSessionCookieValue, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/auth';
+import { createSession, OAUTH_STATE_COOKIE_NAME, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/auth';
 import { appOrigin, isSecureRequest } from '@/lib/request-origin';
 
 interface DiscordTokenResponse {
@@ -18,8 +18,18 @@ interface DiscordUser {
 
 export async function GET(request: Request) {
   const origin = appOrigin(request);
-  const code = new URL(request.url).searchParams.get('code');
-  if (!code) return NextResponse.redirect(new URL('/?error=oauth', origin));
+  const query = new URL(request.url).searchParams;
+  const code = query.get('code');
+  const state = query.get('state');
+  const expectedState = request.headers.get('cookie')
+    ?.split(';')
+    .map((part) => part.trim().split('='))
+    .find(([name]) => name === OAUTH_STATE_COOKIE_NAME)?.[1];
+  if (!code || !state || !expectedState || state !== expectedState) {
+    const response = NextResponse.redirect(new URL('/?error=oauth', origin));
+    response.cookies.delete(OAUTH_STATE_COOKIE_NAME);
+    return response;
+  }
 
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
@@ -51,7 +61,7 @@ export async function GET(request: Request) {
   // La liste des guildes n'est volontairement pas mise en session ici — voir
   // fetchUserGuilds() dans lib/auth.ts, elle est récupérée en direct au
   // moment où on en a besoin plutôt que stockée dans le cookie.
-  const cookieValue = createSessionCookieValue({
+  const cookieValue = await createSession({
     userId: user.id,
     username: user.username,
     globalName: user.global_name,
@@ -60,6 +70,7 @@ export async function GET(request: Request) {
   });
 
   const res = NextResponse.redirect(new URL('/dashboard', origin));
+  res.cookies.delete(OAUTH_STATE_COOKIE_NAME);
   res.cookies.set(SESSION_COOKIE_NAME, cookieValue, {
     httpOnly: true,
     // Basé sur le protocole réel de la requête plutôt que NODE_ENV : évite

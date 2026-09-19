@@ -1,6 +1,6 @@
 import { Events, type Message } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
-import type { WordReactionTrigger } from '@discord-bot-dashboard/database';
+import type { WordReactionConfig, WordReactionTrigger } from '@discord-bot-dashboard/database';
 import type { BotClient, BotModuleHandler } from '../client.js';
 import { extractCustomEmojiId } from '../utils/emoji.js';
 
@@ -30,10 +30,59 @@ function findMatchingTrigger(content: string, triggers: WordReactionTrigger[]): 
   return best;
 }
 
+interface CachedWordReactions {
+  config: WordReactionConfig | null;
+  triggers: WordReactionTrigger[];
+  version: number;
+  expiresAt: number;
+}
+
+const cache = new Map<string, CachedWordReactions>();
+const loadsInProgress = new Map<string, Promise<CachedWordReactions>>();
+const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+const INVALIDATION_POLL_MS = 10_000;
+
+async function loadWordReactions(guildId: string): Promise<CachedWordReactions> {
+  const [config, triggers] = await Promise.all([
+    prisma.wordReactionConfig.findUnique({ where: { guildId } }),
+    prisma.wordReactionTrigger.findMany({ where: { guildId } }),
+  ]);
+  const entry = {
+    config,
+    triggers,
+    version: config?.updatedAt.getTime() ?? 0,
+    expiresAt: Date.now() + CACHE_MAX_AGE_MS,
+  };
+  cache.set(guildId, entry);
+  return entry;
+}
+
+async function getWordReactions(guildId: string): Promise<CachedWordReactions> {
+  const cached = cache.get(guildId);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+  const existingLoad = loadsInProgress.get(guildId);
+  if (existingLoad) return existingLoad;
+  const load = loadWordReactions(guildId).finally(() => loadsInProgress.delete(guildId));
+  loadsInProgress.set(guildId, load);
+  return load;
+}
+
+async function invalidateChangedWordReactions() {
+  if (cache.size === 0) return;
+  const versions = await prisma.wordReactionConfig.findMany({
+    where: { guildId: { in: [...cache.keys()] } },
+    select: { guildId: true, updatedAt: true },
+  });
+  const byGuild = new Map(versions.map((row) => [row.guildId, row.updatedAt.getTime()]));
+  for (const [guildId, entry] of cache) {
+    if ((byGuild.get(guildId) ?? 0) !== entry.version) cache.delete(guildId);
+  }
+}
+
 async function handleMessage(message: Message) {
   if (message.author.bot || !message.guild || !message.content) return;
 
-  const config = await prisma.wordReactionConfig.findUnique({ where: { guildId: message.guild.id } });
+  const { config, triggers } = await getWordReactions(message.guild.id);
   if (!config?.enabled) return;
 
   if (!passesFilter(config.channelMode, config.channelIds, [message.channelId])) return;
@@ -49,11 +98,6 @@ async function handleMessage(message: Message) {
     if (!passesFilter(config.roleMode, config.roleIds, memberRoleIds)) return;
   }
 
-  // Deux requêtes séparées faute de relation Prisma entre les deux modèles
-  // (chacun ne référence que Guild) — acceptable au volume d'un petit
-  // serveur ; à revisiter (relation + include, ou cache par guilde) si le
-  // nombre de messages devient significatif.
-  const triggers = await prisma.wordReactionTrigger.findMany({ where: { guildId: message.guild.id } });
   const trigger = findMatchingTrigger(message.content, triggers);
   if (!trigger) return;
 
@@ -75,5 +119,8 @@ export const wordReactionsModule: BotModuleHandler = {
     client.on(Events.MessageCreate, (message) => {
       handleMessage(message).catch((err) => console.error('wordReactions module failed:', err));
     });
+    setInterval(() => {
+      invalidateChangedWordReactions().catch((err) => console.error('Invalidation cache réactions échouée:', err));
+    }, INVALIDATION_POLL_MS);
   },
 };

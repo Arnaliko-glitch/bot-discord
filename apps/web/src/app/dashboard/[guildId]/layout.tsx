@@ -11,7 +11,7 @@ export default async function GuildLayout({
   children: React.ReactNode;
   params: { guildId: string };
 }) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) redirect('/');
 
   const userGuilds = await fetchUserGuilds(session.accessToken);

@@ -4,7 +4,7 @@ import { getBotIdentity } from '@/lib/discord-bot';
 import { LevelsConfigPage } from '@/components/LevelsConfigPage';
 
 export default async function LevelsPage({ params }: { params: { guildId: string } }) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return null; // le layout parent redirige déjà si non connecté
 
   const [guild, config, rewards, bot] = await Promise.all([

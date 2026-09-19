@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers';
 import crypto from 'node:crypto';
+import { prisma } from '@discord-bot-dashboard/database';
 
 export const SESSION_COOKIE_NAME = 'session';
+export const OAUTH_STATE_COOKIE_NAME = 'oauth_state';
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 jours
 
 // Volontairement minimal : la liste des guildes n'est PAS stockée ici (voir
@@ -122,33 +124,67 @@ export async function fetchUserGuilds(accessToken: string): Promise<SessionGuild
   }
 }
 
-function sign(payload: string): string {
+function tokenHash(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function sessionEncryptionKey(): Buffer {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error('SESSION_SECRET manquant dans .env');
-  return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return crypto.createHash('sha256').update(secret).digest();
 }
 
-export function createSessionCookieValue(data: SessionData): string {
-  const payload = Buffer.from(JSON.stringify(data)).toString('base64url');
-  return `${payload}.${sign(payload)}`;
+function encryptAccessToken(value: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', sessionEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return `${iv.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}.${encrypted.toString('base64url')}`;
 }
 
-function parseSessionCookieValue(value: string | undefined): SessionData | null {
-  if (!value) return null;
-  const [payload, signature] = value.split('.');
-  if (!payload || !signature) return null;
-  try {
-    const expected = sign(payload);
-    const a = Buffer.from(signature);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as SessionData;
-  } catch {
+function decryptAccessToken(value: string): string {
+  const [iv, tag, encrypted] = value.split('.');
+  if (!iv || !tag || !encrypted) throw new Error('Session chiffrée invalide');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', sessionEncryptionKey(), Buffer.from(iv, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(encrypted, 'base64url')), decipher.final()]).toString('utf8');
+}
+
+export async function createSession(data: SessionData): Promise<string> {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
+  await prisma.$transaction([
+    prisma.dashboardSession.deleteMany({ where: { expiresAt: { lte: new Date() } } }),
+    prisma.dashboardSession.create({
+      data: { ...data, accessToken: encryptAccessToken(data.accessToken), tokenHash: tokenHash(token), expiresAt },
+    }),
+  ]);
+  return token;
+}
+
+export async function deleteSession(token?: string): Promise<void> {
+  if (!token) return;
+  await prisma.dashboardSession.deleteMany({ where: { tokenHash: tokenHash(token) } });
+}
+
+export async function getSession(): Promise<SessionData | null> {
+  const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const session = await prisma.dashboardSession.findUnique({ where: { tokenHash: tokenHash(token) } });
+  if (!session) return null;
+  if (session.expiresAt <= new Date()) {
+    await prisma.dashboardSession.delete({ where: { tokenHash: session.tokenHash } }).catch(() => undefined);
     return null;
   }
-}
-
-// Next.js 14 : cookies() est synchrone dans les Server Components / Route Handlers.
-export function getSession(): SessionData | null {
-  return parseSessionCookieValue(cookies().get(SESSION_COOKIE_NAME)?.value);
+  try {
+    return {
+      userId: session.userId,
+      username: session.username,
+      globalName: session.globalName,
+      avatar: session.avatar,
+      accessToken: decryptAccessToken(session.accessToken),
+    };
+  } catch {
+    await prisma.dashboardSession.delete({ where: { tokenHash: session.tokenHash } }).catch(() => undefined);
+    return null;
+  }
 }

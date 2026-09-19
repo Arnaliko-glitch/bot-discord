@@ -9,7 +9,7 @@ function guildIconUrl(guildId: string, icon: string | null) {
 }
 
 export default async function ServerPickerPage() {
-  const session = getSession();
+  const session = await getSession();
   if (!session) redirect('/');
 
   const userGuilds = await fetchUserGuilds(session.accessToken);

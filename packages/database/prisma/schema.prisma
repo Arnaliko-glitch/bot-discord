@@ -359,6 +359,9 @@ model XpSettings {
 model DailyMemberStat {
   id        String   @id
   guildId   String
+  // Clé du jour civil Europe/Paris encodée à 00:00Z (pas un instant).
+  // Les anciens compteurs UTC doivent être reconstruits depuis des événements
+  // horodatés : décaler cette colonne ne suffit pas à réaffecter les membres.
   date      DateTime
   joins     Int      @default(0)
   leaves    Int      @default(0)
@@ -457,4 +460,19 @@ model ReactionRolePanel {
 model BotHeartbeat {
   id        String   @id @default("singleton")
   updatedAt DateTime
+}
+
+// Session du dashboard conservée côté serveur. Le navigateur ne reçoit qu'un
+// jeton aléatoire ; le jeton Discord OAuth reste dans PostgreSQL.
+model DashboardSession {
+  tokenHash   String   @id
+  userId      String
+  username    String
+  globalName  String?
+  avatar      String?
+  accessToken String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
 }

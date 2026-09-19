@@ -6,18 +6,11 @@ import {
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
+import { memberStatsDay, memberStatsDayKey, shiftMemberStatsDay } from '@discord-bot-dashboard/shared';
 import type { SlashCommand } from './types.js';
 
 const ACTIVITY_DAYS = 30;
 const GRID_COLUMNS = 2;
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 // Un émoji rond coloré s'affiche pareil sur mobile et desktop (contrairement
 // aux blocs de code ```ansi, pas reconnus sur mobile). Sa largeur de rendu
@@ -78,20 +71,18 @@ export const statistiquesCommand: SlashCommand = {
     const members = await guild.members.fetch().catch(() => guild.members.cache);
     const memberCount = members.filter((m) => !m.user.bot).size;
 
-    const today = startOfUtcDay(new Date());
-    const rangeStart = new Date(today);
-    rangeStart.setUTCDate(rangeStart.getUTCDate() - (ACTIVITY_DAYS - 1));
+    const today = memberStatsDay(new Date());
+    const rangeStart = shiftMemberStatsDay(today, -(ACTIVITY_DAYS - 1));
 
     const rows = await prisma.dailyMemberStat.findMany({
-      where: { guildId: guild.id, date: { gte: rangeStart } },
+      where: { guildId: guild.id, date: { gte: rangeStart, lte: today } },
       orderBy: { date: 'asc' },
     });
-    const byDate = new Map(rows.map((r) => [isoDate(r.date), r]));
+    const byDate = new Map(rows.map((r) => [memberStatsDayKey(r.date), r]));
 
     const days = Array.from({ length: ACTIVITY_DAYS }, (_, i) => {
-      const d = new Date(today);
-      d.setUTCDate(d.getUTCDate() - (ACTIVITY_DAYS - 1 - i));
-      const key = isoDate(d);
+      const d = shiftMemberStatsDay(today, -(ACTIVITY_DAYS - 1 - i));
+      const key = memberStatsDayKey(d);
       const row = byDate.get(key);
       const joins = row?.joins ?? 0;
       const leaves = row?.leaves ?? 0;
@@ -109,7 +100,7 @@ export const statistiquesCommand: SlashCommand = {
         { name: `Variation (${ACTIVITY_DAYS} jours)`, value: `${statusDot(netTotal)} **${netTotalText}**`, inline: true }
       )
       .setDescription(buildActivityGrid(days))
-      .setFooter({ text: interaction.client.user.username, iconURL: interaction.client.user.displayAvatarURL() })
+      .setFooter({ text: `${interaction.client.user.username} • Heure de Paris`, iconURL: interaction.client.user.displayAvatarURL() })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

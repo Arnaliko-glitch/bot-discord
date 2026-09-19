@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "tsc && node --test tests/*.test.cjs",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit"
   },
