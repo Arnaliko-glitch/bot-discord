@@ -186,16 +186,14 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
 
   const closerName = resolveDisplayName(interaction);
   const isSelfClose = interaction.user.id === ticket.creatorId;
-  // Les deux fetch sont indépendants — inutile d'attendre l'un pour lancer
-  // l'autre (idem plus bas pour les effets de bord qui ne dépendent pas les
-  // uns des autres : c'est ce qui rend l'action plus rapide à l'usage).
-  const [creator, creatorMember] = await Promise.all([
-    interaction.client.users.cache.get(ticket.creatorId) ??
-      interaction.client.users.fetch(ticket.creatorId).catch(() => null),
-    interaction.guild.members.cache.get(ticket.creatorId) ??
-      interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
-  ]);
-  const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
+  const cachedCreator = interaction.client.users.cache.get(ticket.creatorId) ?? null;
+  const cachedCreatorMember = interaction.guild.members.cache.get(ticket.creatorId) ?? null;
+  const creatorDisplayName = cachedCreatorMember?.displayName ?? ticket.creatorName;
+  // Le profil n'est requis que pour envoyer un éventuel MP. Sa récupération
+  // ne doit pas bloquer la fermeture du salon.
+  const creatorPromise = reason
+    ? Promise.resolve(cachedCreator ?? interaction.client.users.fetch(ticket.creatorId).catch(() => null))
+    : Promise.resolve(cachedCreator);
 
   // "Voulez-vous que le ticket soit automatiquement supprimé lorsqu'il est
   // fermé par un administrateur ou un modérateur ?" — ne s'applique donc
@@ -211,21 +209,21 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
     // ne ferait que retarder la vraie suppression pour rien (c'est ce qui
     // donnait l'impression d'un salon renommé puis supprimé avec un délai).
     if (reason) {
-      await creator
-        ?.send({
+      void creatorPromise.then((creator) =>
+        creator?.send({
           embeds: [
             new EmbedBuilder()
               .setColor(CLOSED_COLOR)
               .setDescription(`🔒 Votre ticket a été fermé par **${closerName}**.\n\n**Raison :** ${reason}`),
           ],
-        })
-        .catch(() => undefined);
+        }).catch(() => undefined)
+      );
     }
     await deleteTicket(
       interaction,
       { ...ticket, closedBy: interaction.user.id, closeReason: reason },
       config,
-      { creator, creatorMember },
+      { creator: cachedCreator, creatorMember: cachedCreatorMember },
       true
     );
     return;
@@ -255,6 +253,8 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
   );
   if (lines.length > 0) closedEmbed.setDescription(lines.join('\n'));
 
+  // Ces trois changements constituent la fermeture effective du ticket.
+  // On les attend avant de confirmer la réussite à l'utilisateur.
   await Promise.all([
     'permissionOverwrites' in channel
       ? channel.permissionOverwrites
@@ -265,18 +265,6 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
       where: { id: ticket.id },
       data: { status: 'closed', closedBy: interaction.user.id, closedAt: new Date(), closeReason: reason, updatedAt: new Date() },
     }),
-    logToTicketChannel(interaction, config, logEmbed),
-    reason
-      ? creator
-          ?.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(CLOSED_COLOR)
-                .setDescription(`🔒 Votre ticket a été fermé par **${closerName}**.\n\n**Raison :** ${reason}`),
-            ],
-          })
-          .catch(() => undefined)
-      : Promise.resolve(),
     updateActionMessage(interaction, ticket, closedEmbed, buildClosedStateRow()),
   ]);
 
@@ -287,11 +275,28 @@ export async function closeTicket(interaction: TicketInteraction, ticket: Ticket
     })
     .catch(() => undefined);
 
+  // Les logs, le MP et le message d'information ne changent plus le résultat
+  // de l'action. Ils peuvent finir après la confirmation sans la ralentir.
   const noticeEmbed = new EmbedBuilder()
     .setColor(CLOSED_COLOR)
     .setAuthor({ name: `${closerName} vient de fermer le ticket.`, iconURL: interaction.user.displayAvatarURL() });
   if (reason) noticeEmbed.setDescription(`**Raison :** ${reason}`);
-  await channel.send({ embeds: [noticeEmbed] }).catch(() => undefined);
+  void Promise.allSettled([
+    logToTicketChannel(interaction, config, logEmbed),
+    reason
+      ? creatorPromise.then((creator) =>
+          creator?.send({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(CLOSED_COLOR)
+                  .setDescription(`🔒 Votre ticket a été fermé par **${closerName}**.\n\n**Raison :** ${reason}`),
+              ],
+            })
+            .catch(() => undefined)
+        )
+      : Promise.resolve(),
+    channel.send({ embeds: [noticeEmbed] }),
+  ]);
 }
 
 // Réouverture — renomme "réouvert-", restaure l'accès du créateur, journalise.
@@ -300,9 +305,7 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
   if (!channel || !interaction.guild || !('send' in channel)) return;
 
   const reopenerName = resolveDisplayName(interaction);
-  const creatorMember =
-    interaction.guild.members.cache.get(ticket.creatorId) ??
-    (await interaction.guild.members.fetch(ticket.creatorId).catch(() => null));
+  const creatorMember = interaction.guild.members.cache.get(ticket.creatorId) ?? null;
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
   const newName = swapPrefix(channel.isThread() ? channel.name : (channel as { name: string }).name, CLOSED_PREFIX, REOPENED_PREFIX);
@@ -328,13 +331,6 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
       where: { id: ticket.id },
       data: { status: 'open', reopenedAt: new Date(), updatedAt: new Date() },
     }),
-    logToTicketChannel(
-      interaction,
-      config,
-      new EmbedBuilder()
-        .setColor(CONFIRM_COLOR)
-        .setAuthor({ name: `${reopenerName} a réouvert le ticket de ${creatorDisplayName}.`, iconURL: interaction.user.displayAvatarURL() })
-    ),
     updateActionMessage(interaction, ticket, reopenedEmbed, buildCloseRow('Refermer')),
   ]);
 
@@ -345,15 +341,22 @@ export async function reopenTicket(interaction: TicketInteraction, ticket: Ticke
     })
     .catch(() => undefined);
 
-  await channel
-    .send({
+  void Promise.allSettled([
+    logToTicketChannel(
+      interaction,
+      config,
+      new EmbedBuilder()
+        .setColor(CONFIRM_COLOR)
+        .setAuthor({ name: `${reopenerName} a réouvert le ticket de ${creatorDisplayName}.`, iconURL: interaction.user.displayAvatarURL() })
+    ),
+    channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor(CONFIRM_COLOR)
           .setAuthor({ name: `${reopenerName} vient de réouvrir le ticket.`, iconURL: interaction.user.displayAvatarURL() }),
       ],
-    })
-    .catch(() => undefined);
+    }),
+  ]);
 }
 
 // Suppression définitive — uniquement possible sur un ticket déjà fermé.
@@ -374,14 +377,14 @@ export async function deleteTicket(
   if (!channel || !interaction.guild || !('send' in channel)) return;
 
   const deleterName = resolveDisplayName(interaction);
+  // Les données persistées suffisent au log. Une absence dans le cache ne
+  // justifie pas deux appels Discord avant de supprimer le salon.
   const [creator, creatorMember] = prefetched
     ? [prefetched.creator, prefetched.creatorMember]
-    : await Promise.all([
-        interaction.client.users.cache.get(ticket.creatorId) ??
-          interaction.client.users.fetch(ticket.creatorId).catch(() => null),
-        interaction.guild.members.cache.get(ticket.creatorId) ??
-          interaction.guild.members.fetch(ticket.creatorId).catch(() => null),
-      ]);
+    : [
+        interaction.client.users.cache.get(ticket.creatorId) ?? null,
+        interaction.guild.members.cache.get(ticket.creatorId) ?? null,
+      ];
   const creatorDisplayName = creatorMember?.displayName ?? ticket.creatorName;
 
   // Pas de raison affichée si le créateur a fermé lui-même son ticket (aucune

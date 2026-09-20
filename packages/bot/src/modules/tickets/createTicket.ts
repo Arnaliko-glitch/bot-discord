@@ -102,11 +102,16 @@ export async function createTicketChannel(
     components: [buildCloseRow()],
   });
   await prisma.ticket.update({ where: { id: ticket.id }, data: { activeCloseMessageId: actionMessage.id } });
-  await actionMessage.pin().catch((err) => console.error('Épinglage du message de ticket échoué:', err));
-  // Discord poste automatiquement "X a épinglé un message" après un pin —
-  // on le supprime aussitôt pour ne pas polluer la conversation.
-  const pinNotice = await channel.messages.fetch({ limit: 1 }).then((msgs) => msgs.first()).catch(() => null);
-  if (pinNotice?.type === MessageType.ChannelPinnedMessage) await pinNotice.delete().catch(() => undefined);
+  // L'épinglage et le nettoyage du message système ne sont pas nécessaires
+  // pour considérer le ticket comme créé. Les faire en arrière-plan évite de
+  // retarder la confirmation d'ouverture de plusieurs appels Discord.
+  void (async () => {
+    await actionMessage.pin();
+    // Discord poste automatiquement "X a épinglé un message" après un pin —
+    // on le supprime aussitôt pour ne pas polluer la conversation.
+    const pinNotice = await channel.messages.fetch({ limit: 1 }).then((msgs) => msgs.first()).catch(() => null);
+    if (pinNotice?.type === MessageType.ChannelPinnedMessage) await pinNotice.delete().catch(() => undefined);
+  })().catch((err) => console.error('Épinglage du message de ticket échoué:', err));
 
   return channel;
 }

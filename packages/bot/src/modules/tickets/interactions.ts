@@ -136,7 +136,10 @@ async function resolveRequest(
   const guild = interaction.guild;
   if (!guild) return null;
 
-  const request = await prisma.ticketRequest.findUnique({ where: { id: requestId } });
+  const [request, config] = await Promise.all([
+    prisma.ticketRequest.findUnique({ where: { id: requestId } }),
+    prisma.ticketConfig.findUnique({ where: { guildId: guild.id } }),
+  ]);
   if (!request || request.guildId !== guild.id) {
     await interaction.reply({ content: 'Demande introuvable.', flags: MessageFlags.Ephemeral });
     return null;
@@ -146,7 +149,6 @@ async function resolveRequest(
     return null;
   }
 
-  const config = await prisma.ticketConfig.findUnique({ where: { guildId: guild.id } });
   if (!config) return null;
   if (!canModerateTicket(interaction, config)) {
     await interaction.reply({ content: 'Vous n\'avez pas la permission de traiter cette demande.', flags: MessageFlags.Ephemeral });
@@ -168,6 +170,10 @@ async function handleApprove(interaction: ButtonInteraction) {
     where: { id: request.id },
     data: { status: 'approved', decidedBy: interaction.user.id },
   });
+
+  // Retire immédiatement les boutons pour montrer que le clic a été pris en
+  // compte et empêcher une seconde approbation pendant la création du salon.
+  await interaction.editReply({ content: 'Création du ticket en cours...', embeds: [], components: [] });
 
   const requester = await interaction.client.users.fetch(request.requesterId).catch(() => null);
   const channel = requester
@@ -260,7 +266,10 @@ async function resolveTicket(
   const guild = interaction.guild;
   if (!guild) return null;
 
-  const ticket = await prisma.ticket.findUnique({ where: { channelId: interaction.channelId ?? '' } });
+  const [ticket, config] = await Promise.all([
+    prisma.ticket.findUnique({ where: { channelId: interaction.channelId ?? '' } }),
+    prisma.ticketConfig.findUnique({ where: { guildId: guild.id } }),
+  ]);
   if (!ticket || ticket.status !== expectedStatus) {
     await interaction.reply({
       content: expectedStatus === 'open' ? 'Ce ticket est introuvable ou déjà fermé.' : 'Ce ticket est introuvable ou n\'est pas fermé.',
@@ -268,7 +277,6 @@ async function resolveTicket(
     });
     return null;
   }
-  const config = await prisma.ticketConfig.findUnique({ where: { guildId: guild.id } });
   if (!config) return null;
   return { ticket, config };
 }
