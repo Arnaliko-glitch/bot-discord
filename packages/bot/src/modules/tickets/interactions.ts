@@ -171,9 +171,9 @@ async function handleApprove(interaction: ButtonInteraction) {
     data: { status: 'approved', decidedBy: interaction.user.id },
   });
 
-  // Retire immédiatement les boutons pour montrer que le clic a été pris en
-  // compte et empêcher une seconde approbation pendant la création du salon.
-  await interaction.editReply({ content: 'Création du ticket en cours...', embeds: [], components: [] });
+  // Retire les boutons pendant la création du salon en conservant les mentions
+  // des rôles et l'embed de la demande.
+  await interaction.editReply({ components: [] });
 
   const requester = await interaction.client.users.fetch(request.requesterId).catch(() => null);
   const channel = requester
