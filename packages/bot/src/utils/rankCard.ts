@@ -12,6 +12,7 @@ export interface RankCardOptions {
   avatarUrl: string;
   username: string;
   place: number;
+  totalMembers?: number;
   level: number;
   xpIntoLevel: number;
   xpForNextLevel: number;
@@ -23,6 +24,7 @@ export async function generateRankCard({
   avatarUrl,
   username,
   place,
+  totalMembers,
   level,
   xpIntoLevel,
   xpForNextLevel,
@@ -65,13 +67,30 @@ export async function generateRankCard({
   // Largeur réelle du compteur xp mesurée avant de dessiner le pseudo, pour
   // ne réserver que l'espace qu'il occupe vraiment (un pseudo long ne doit
   // pas pouvoir chevaucher un petit compteur, ni l'inverse).
-  const xpText = `${xpIntoLevel} / ${xpForNextLevel}`;
+  const xpText = `${xpIntoLevel} / ${xpForNextLevel} xp`;
   ctx.font = `23px ${FONT_STACK}`;
   const xpTextWidth = ctx.measureText(xpText).width;
 
   ctx.fillStyle = '#ffffff';
   ctx.font = `32px ${fontStackFor(username)}`;
-  ctx.fillText(username, textX, 46, rightEdge - textX - xpTextWidth - 20);
+  const usernameWidth = rightEdge - textX - xpTextWidth - 20;
+  // On tolère une compression de 20 %, puis on tronque sans couper les
+  // emojis composés ni les caractères accompagnés d'accents combinés.
+  const minScale = 0.8;
+  let displayedUsername = username;
+  if (ctx.measureText(username).width * minScale > usernameWidth) {
+    const characters = Array.from(
+      new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(username),
+      ({ segment }) => segment,
+    );
+    do {
+      characters.pop();
+      displayedUsername = `${characters.join('')}…`;
+    } while (characters.length > 0 && ctx.measureText(displayedUsername).width * minScale > usernameWidth);
+  }
+  if (usernameWidth > 0 && ctx.measureText(displayedUsername).width * minScale <= usernameWidth) {
+    ctx.fillText(displayedUsername, textX, 46, usernameWidth);
+  }
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffffff';
@@ -100,7 +119,8 @@ export async function generateRankCard({
   ctx.fillText('Place', textX, HEIGHT - 42);
   ctx.fillStyle = '#ffffff';
   ctx.font = `25px ${FONT_STACK}`;
-  ctx.fillText(String(place), textX, HEIGHT - 18);
+  const placeText = totalMembers === undefined ? String(place) : `${place} / ${totalMembers}`;
+  ctx.fillText(placeText, textX, HEIGHT - 18);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = ACCENT;

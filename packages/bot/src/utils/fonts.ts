@@ -11,6 +11,8 @@ const FALLBACK_FONT_FAMILY = 'Noto Sans';
 // Poppins ni Noto Sans classique ne les couvrent, ils s'affichaient en
 // carrés (tofu) sans cette police dédiée.
 const MATH_FALLBACK_FONT_FAMILY = 'Noto Sans Math';
+// Symboles décoratifs, notamment les pièces d'échecs (♛).
+const SYMBOLS_FALLBACK_FONT_FAMILY = 'Noto Sans Symbols 2';
 // Autre style de pseudo "fantaisie" courant : des syllabaires Cherokee
 // (U+13A0-U+13FF) utilisés comme sosies visuels de lettres latines.
 const CHEROKEE_FALLBACK_FONT_FAMILY = 'Noto Sans Cherokee';
@@ -23,6 +25,10 @@ const EMOJI_FALLBACK_FONT_FAMILY = 'Twemoji Mozilla';
 GlobalFonts.registerFromPath(path.resolve(__dirname, '../../assets/fonts/Poppins-ExtraBold.ttf'), TITLE_FONT_FAMILY);
 GlobalFonts.registerFromPath(path.resolve(__dirname, '../../assets/fonts/NotoSans-Variable.ttf'), FALLBACK_FONT_FAMILY);
 GlobalFonts.registerFromPath(path.resolve(__dirname, '../../assets/fonts/NotoSansMath-Regular.ttf'), MATH_FALLBACK_FONT_FAMILY);
+GlobalFonts.registerFromPath(
+  path.resolve(__dirname, '../../assets/fonts/NotoSansSymbols2-Regular.ttf'),
+  SYMBOLS_FALLBACK_FONT_FAMILY
+);
 GlobalFonts.registerFromPath(
   path.resolve(__dirname, '../../assets/fonts/NotoSansCherokee-Variable.ttf'),
   CHEROKEE_FALLBACK_FONT_FAMILY
@@ -41,7 +47,7 @@ GlobalFonts.registerFromPath(
 // et Skia prend la PREMIÈRE police qui couvre le caractère, pas la plus
 // jolie — Twemoji doit donc passer avant, sinon certains emoji s'affichaient
 // en noir/blanc au lieu de la version colorée attendue.
-export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}"`;
+export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}", "${SYMBOLS_FALLBACK_FONT_FAMILY}"`;
 
 // Même repli, mais sans Poppins en tête — aucune des polices de secours
 // n'a d'équivalent gras (@napi-rs/canvas ne sait pas synthétiser un gras
@@ -49,7 +55,7 @@ export const FONT_STACK = `"${TITLE_FONT_FAMILY}", "${EMOJI_FALLBACK_FONT_FAMILY
 // rendu à moitié gras/moitié fin. Utilisée quand le texte contient des
 // caractères que Poppins ne couvre pas, pour rester visuellement cohérent
 // (tout en fin) plutôt qu'à moitié gras.
-const NON_BOLD_FONT_STACK = `"${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}"`;
+const NON_BOLD_FONT_STACK = `"${EMOJI_FALLBACK_FONT_FAMILY}", "${FALLBACK_FONT_FAMILY}", "${MATH_FALLBACK_FONT_FAMILY}", "${CHEROKEE_FALLBACK_FONT_FAMILY}", "${SYMBOLS_FALLBACK_FONT_FAMILY}"`;
 
 // Plage de caractères que Poppins couvre correctement : latin de base
 // ( -ɏ), latin étendu additionnel (Ḁ-ỿ) et ponctuation
