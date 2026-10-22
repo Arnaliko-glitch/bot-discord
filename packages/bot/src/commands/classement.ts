@@ -8,6 +8,7 @@ import {
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
+import { levelForXp, levelProgress } from '@discord-bot-dashboard/shared';
 import type { SlashCommand } from './types.js';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -89,7 +90,13 @@ export const classementCommand: SlashCommand = {
     const lines = entries.map((entry, i) => {
       const rank = MEDALS[i] ?? `**${i + 1}.**`;
       const handle = entry.handle ? ` \`@${entry.handle}\`` : '';
-      return `${rank} **${entry.username}**${handle}\n└ Niveau ${entry.level} • (${entry.xp} XP)`;
+      const level = levelForXp(entry.xp, settings.curveStyle, settings.curveMultiplier, settings.maxLevel);
+      const { xpIntoLevel, xpForNextLevel } = levelProgress(entry.xp, level, settings.curveStyle, settings.curveMultiplier);
+      const atMaxLevel = settings.maxLevel > 0 && level >= settings.maxLevel;
+      const progress = atMaxLevel ? 1 : xpForNextLevel > 0 ? xpIntoLevel / xpForNextLevel : 0;
+      const filled = Math.round(Math.max(0, Math.min(1, progress)) * 10);
+      const bar = '🟥'.repeat(filled) + '⬛'.repeat(10 - filled);
+      return `${rank} **${entry.username}**${handle}\n└ Niveau ${level} • (${entry.xp} XP)\n${bar}`;
     });
 
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
