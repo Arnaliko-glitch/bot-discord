@@ -1,6 +1,5 @@
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -9,9 +8,7 @@ import {
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import { prisma } from '@discord-bot-dashboard/database';
-import { levelForXp, levelProgress } from '@discord-bot-dashboard/shared';
 import type { SlashCommand } from './types.js';
-import { generateRankCard } from '../utils/rankCard.js';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const LEADERBOARD_SIZE = 10;
@@ -112,31 +109,6 @@ export const classementCommand: SlashCommand = {
       .setTimestamp();
     if (leaderboardUrl) embed.setURL(leaderboardUrl);
 
-    const personalXp = await prisma.userXp.findUnique({
-      where: { guildId_discordUserId: { guildId: guild.id, discordUserId: interaction.user.id } },
-    });
-    const xp = personalXp?.xp ?? 0;
-    const curveStyle = settings.curveStyle ?? 'exponential';
-    const curveMultiplier = settings.curveMultiplier ?? 1;
-    const level = levelForXp(xp, curveStyle, curveMultiplier, settings.maxLevel ?? 0);
-    const { xpIntoLevel, xpForNextLevel } = levelProgress(xp, level, curveStyle, curveMultiplier);
-    const place = 1 + (await prisma.userXp.count({
-      where: { guildId: guild.id, discordUserId: { in: humanIds }, xp: { gt: xp } },
-    }));
-    const member = guild.members.cache.get(interaction.user.id)
-      ?? await guild.members.fetch(interaction.user.id).catch(() => null);
-    const card = await generateRankCard({
-      avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
-      username: member?.displayName ?? interaction.user.globalName ?? interaction.user.username,
-      place,
-      totalMembers: humanMembers.size,
-      level,
-      xpIntoLevel,
-      xpForNextLevel,
-    });
-    const attachment = new AttachmentBuilder(card, { name: 'rank.png' });
-    embed.setImage('attachment://rank.png');
-
     const components = leaderboardUrl
       ? [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -145,6 +117,6 @@ export const classementCommand: SlashCommand = {
         ]
       : [];
 
-    await interaction.editReply({ embeds: [embed], components, files: [attachment] });
+    await interaction.editReply({ embeds: [embed], components });
   },
 };
