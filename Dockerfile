@@ -5,6 +5,9 @@
 # est une dépendance native, plus sûre à builder/exécuter sur glibc.
 
 FROM node:20-slim AS base
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /app
 
