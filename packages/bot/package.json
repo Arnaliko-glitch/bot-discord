@@ -8,6 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "test:giveaway": "tsx --test tests/giveaway.test.ts",
+    "test:giveaway:integration": "tsx --test tests/giveaway.integration.test.ts",
     "deploy-commands": "tsx src/deploy-commands.ts"
   },
   "dependencies": {

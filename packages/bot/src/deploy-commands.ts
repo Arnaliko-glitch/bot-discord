@@ -14,8 +14,20 @@ if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
 if (!clientId) throw new Error('DISCORD_CLIENT_ID manquant dans .env');
 
 const rest = new REST().setToken(token);
-const body = commands.map((c) => c.data.toJSON());
+const commandIndex = process.argv.indexOf('--command');
+const commandName = commandIndex >= 0 ? process.argv[commandIndex + 1] : undefined;
+const guildId = process.env.DISCORD_GUILD_ID;
+const route = guildId ? Routes.applicationGuildCommands(clientId, guildId) : Routes.applicationCommands(clientId);
 
-console.log(`Déploiement de ${body.length} commande(s) slash...`);
-await rest.put(Routes.applicationCommands(clientId), { body });
+if (commandIndex >= 0) {
+  const command = commands.find((entry) => entry.data.name === commandName);
+  if (!command) throw new Error(`Commande inconnue : ${commandName ?? '(nom manquant)'}`);
+  console.log(`Déploiement de /${commandName}${guildId ? ' sur le serveur de développement' : ''}...`);
+  // POST crée ou met à jour cette commande sans retirer les autres.
+  await rest.post(route, { body: command.data.toJSON() });
+} else {
+  const body = commands.map((c) => c.data.toJSON());
+  console.log(`Déploiement de ${body.length} commande(s) slash...`);
+  await rest.put(route, { body });
+}
 console.log('Commandes déployées.');

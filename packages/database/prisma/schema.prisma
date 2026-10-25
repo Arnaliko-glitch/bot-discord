@@ -35,6 +35,60 @@ model Guild {
   WordReactionConfig  WordReactionConfig?
   WordReactionTrigger WordReactionTrigger[]
   XpSettings          XpSettings?
+  Giveaways           Giveaway[]
+}
+
+model Giveaway {
+  id          String          @id
+  guildId     String
+  channelId   String
+  messageId   String          @unique
+  hostId      String
+  prize       String
+  winnerCount Int
+  title       String?
+  description String?
+  thumbnailName String?
+  mentionRoleIds String[]      @default([])
+  showParticipants Boolean     @default(true)
+  imageName   String?
+  status      String          @default("active")
+  endsAt      DateTime
+  endedAt     DateTime?
+  winnerIds   String[]        @default([])
+  // Une annonce par tirage. Les anciens giveaways terminés ne sont pas annoncés rétroactivement.
+  announcementNonce     String?
+  announcementMessageId String?
+  // Le message est resynchronisé après une panne Discord ou un redémarrage.
+  needsSync   Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  Guild       Guild           @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  entries     GiveawayEntry[]
+  notifications GiveawayNotification[]
+
+  @@index([status, endsAt])
+  @@index([needsSync])
+}
+
+model GiveawayNotification {
+  id          String   @id
+  giveawayId  String
+  recipientId String
+  embeds      Json
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  giveaway    Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@index([status, giveawayId])
+}
+
+model GiveawayEntry {
+  giveawayId String
+  userId     String
+  createdAt  DateTime @default(now())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@id([giveawayId, userId])
 }
 
 // Réagit automatiquement (emoji) quand un message commence par une phrase

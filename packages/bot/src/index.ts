@@ -24,6 +24,10 @@ import { reactionRolesModule } from './modules/reactionRoles/index.js';
 import { privateRoomsModule } from './modules/privateRooms/index.js';
 import { handlePrivateRoomInteraction } from './modules/privateRooms/interactions.js';
 import { wordReactionsModule } from './modules/wordReactions.js';
+import { giveawaysModule, handleGiveawayInteraction, handleGiveawayRemoval, GIVEAWAY_BUTTON_PREFIX, GIVEAWAY_REMOVE_PREFIX, GIVEAWAY_LEAVE_PREFIX, GIVEAWAY_PAGE_PREFIX } from './modules/giveaways/index.js';
+import { giveawayReply } from './modules/giveaways/presentation.js';
+import { initializeGiveawayEmojis } from './modules/giveaways/emojis.js';
+import { GIVEAWAY_DRAFT_PREFIX, handleGiveawayDraftInteraction } from './modules/giveaways/builder.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) throw new Error('DISCORD_BOT_TOKEN manquant dans .env');
@@ -93,6 +97,7 @@ const modules: BotModuleHandler[] = [
   reactionRolesModule,
   privateRoomsModule,
   wordReactionsModule,
+  giveawaysModule,
 ];
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -104,8 +109,44 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (err) {
       console.error(`Commande /${interaction.commandName} échouée:`, err);
       const content = 'Une erreur est survenue lors de l\'exécution de cette commande.';
-      if (interaction.deferred || interaction.replied) await interaction.editReply({ content }).catch(() => undefined);
-      else await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);
+      const response = interaction.commandName === 'giveaway' ? giveawayReply(content) : { content };
+      if (interaction.deferred || interaction.replied) await interaction.editReply(response).catch(() => undefined);
+      else await interaction.reply({ ...response, flags: MessageFlags.Ephemeral }).catch(() => undefined);
+    }
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu())
+    && interaction.customId.startsWith(GIVEAWAY_DRAFT_PREFIX)) {
+    try { await handleGiveawayDraftInteraction(interaction); }
+    catch (error) {
+      console.error('Configuration giveaway échouée :', error);
+      const content = 'Impossible de configurer le giveaway pour le moment. Réessaie.';
+      if (interaction.deferred || interaction.replied) await interaction.editReply(giveawayReply(content)).catch(() => undefined);
+      else await interaction.reply({ ...giveawayReply(content), flags: MessageFlags.Ephemeral }).catch(() => undefined);
+    }
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith(GIVEAWAY_REMOVE_PREFIX)) {
+    try { await handleGiveawayRemoval(interaction); }
+    catch (error) {
+      console.error('Retrait participant giveaway échoué :', error);
+      const content = 'Impossible de retirer ce participant pour le moment. Réessaie.';
+      if (interaction.deferred || interaction.replied) await interaction.editReply(giveawayReply(content)).catch(() => undefined);
+      else await interaction.reply({ ...giveawayReply(content), flags: MessageFlags.Ephemeral }).catch(() => undefined);
+    }
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isModalSubmit()) && (interaction.customId.startsWith(GIVEAWAY_BUTTON_PREFIX) || interaction.customId.startsWith('giveaway-participants:') || interaction.customId.startsWith(GIVEAWAY_LEAVE_PREFIX) || interaction.customId.startsWith(GIVEAWAY_PAGE_PREFIX))) {
+    try {
+      await handleGiveawayInteraction(interaction);
+    } catch (error) {
+      console.error('Interaction giveaway échouée :', error);
+      const content = 'Impossible de modifier ta participation pour le moment. Réessaie dans quelques instants.';
+      if (interaction.deferred || interaction.replied) await interaction.editReply(giveawayReply(content)).catch(() => undefined);
+      else await interaction.reply({ ...giveawayReply(content), flags: MessageFlags.Ephemeral }).catch(() => undefined);
     }
     return;
   }
@@ -137,6 +178,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Bot connecté en tant que ${readyClient.user.tag}`);
+  await initializeGiveawayEmojis(readyClient).catch((error) => console.error('Icône de mentions giveaway indisponible :', error));
 
   // Garde la table Guild à jour avec les serveurs où le bot est présent —
   // le dashboard s'en sert pour savoir quelles guildes proposer à l'utilisateur.
